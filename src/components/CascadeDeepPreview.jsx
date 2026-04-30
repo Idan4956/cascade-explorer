@@ -2,7 +2,7 @@ import React from 'react'
 import { FileTile, kindLabel, IconEye, IconShare, IconStar, IconCopy, IconMore, IconPlus } from './icons'
 import { AIActions, TAGS } from './features'
 
-export default function CascadeDeepPreview({ item, accent }) {
+export default function CascadeDeepPreview({ item, accent, tagMap, onToggleTag }) {
   if (!item) return (
     <div style={{
       flex: 1, minWidth: 300, background: 'rgba(255,255,255,0.85)',
@@ -65,9 +65,9 @@ export default function CascadeDeepPreview({ item, accent }) {
         <div style={{ fontSize: 10.5, fontWeight: 600, color: '#888', letterSpacing: 0.5, padding: '6px 0 8px', textTransform: 'uppercase' }}>Tags</div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {TAGS.map(t => {
-            const active = item.tags?.includes(t.id)
+            const active = (tagMap?.[item.path] || item.tags || []).includes(t.id)
             return (
-              <button key={t.id} style={{
+              <button key={t.id} onClick={() => onToggleTag?.(item.path, t.id)} style={{
                 fontSize: 11, padding: '3px 9px', borderRadius: 99,
                 background: active ? `oklch(0.94 0.05 ${t.hue})` : 'transparent',
                 color: active ? `oklch(0.35 0.14 ${t.hue})` : '#666',

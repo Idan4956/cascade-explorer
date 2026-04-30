@@ -15,6 +15,7 @@ export default function CascadeColumn({
   onTogglePin,
   accent,
   extraFilter,
+  tagMap,
 }) {
   const { entries, loading, error, refresh } = useDirectory(dirPath)
   const [showFilter, setShowFilter] = React.useState(false)
@@ -89,7 +90,8 @@ export default function CascadeColumn({
         {!error && filtered.map(item => {
           const isSel = selectedPath === item.path || multiSel.includes(item.path)
           const isMulti = multiSel.includes(item.path) && multiSel.length > 1
-          const hasTags = item.tags?.length > 0
+          const itemTags = tagMap?.[item.path] || item.tags || []
+          const hasTags = itemTags.length > 0
 
           return (
             <button
@@ -113,7 +115,7 @@ export default function CascadeColumn({
               }}>
                 {item.name}
               </span>
-              {hasTags && item.tags.map(t => {
+              {hasTags && itemTags.map(t => {
                 const tag = TAGS.find(x => x.id === t)
                 return tag && (
                   <div key={t} style={{ width: 6, height: 6, borderRadius: 99, background: `oklch(0.62 0.16 ${tag.hue})`, flex: 'none' }} />

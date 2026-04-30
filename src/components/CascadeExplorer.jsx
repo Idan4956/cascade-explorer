@@ -59,6 +59,26 @@ export default function CascadeExplorer({ homedir, accent = 'purple' }) {
   const [nodeMap, setNodeMap] = React.useState({})
   const [loadedDirs, setLoadedDirs] = React.useState({})
 
+  // ── Tag map: { [filePath]: string[] } loaded from disk ───────
+  const [tagMap, setTagMap] = React.useState({})
+
+  React.useEffect(() => {
+    const api = window.electronAPI
+    if (api) api.getAllTags().then(t => setTagMap(t || {}))
+  }, [])
+
+  const toggleTag = React.useCallback((filePath, tagId) => {
+    setTagMap(prev => {
+      const current = prev[filePath] || []
+      const next = current.includes(tagId)
+        ? current.filter(t => t !== tagId)
+        : [...current, tagId]
+      const api = window.electronAPI
+      if (api) api.setTags(filePath, next)
+      return { ...prev, [filePath]: next }
+    })
+  }, [])
+
   const registerEntries = React.useCallback((entries) => {
     setNodeMap(prev => {
       const next = { ...prev }
@@ -257,6 +277,7 @@ export default function CascadeExplorer({ homedir, accent = 'purple' }) {
               onEntries={registerEntries}
               quickFilters={quickFilters}
               showHidden={showHidden}
+              tagMap={tagMap}
             />
           ))}
 
@@ -273,7 +294,7 @@ export default function CascadeExplorer({ homedir, accent = 'purple' }) {
           ) : lastSelItems.length > 1 ? (
             <CompareView items={lastSelItems} accent={A} />
           ) : (
-            <CascadeDeepPreview item={previewItem} accent={A} />
+            <CascadeDeepPreview item={previewItem} accent={A} tagMap={tagMap} onToggleTag={toggleTag} />
           )}
 
           <SelectionBar
@@ -318,7 +339,8 @@ export default function CascadeExplorer({ homedir, accent = 'purple' }) {
           x={ctxMenu.x} y={ctxMenu.y} accent={A}
           onClose={() => setCtxMenu(null)}
           items={buildContextItems(ctxMenu, {
-            togglePin, setShowRename, setCtxMenu, handleDelete
+            togglePin, setShowRename, setCtxMenu, handleDelete,
+            tagMap, toggleTag,
           })}
         />
       )}
@@ -327,7 +349,7 @@ export default function CascadeExplorer({ homedir, accent = 'purple' }) {
 }
 
 // ── ColumnWithLoader — bridges useDirectory into CascadeColumn ──────────────
-function ColumnWithLoader({ dirPath, onEntries, quickFilters, showHidden, ...colProps }) {
+function ColumnWithLoader({ dirPath, onEntries, quickFilters, showHidden, tagMap, ...colProps }) {
   const { entries } = useDirectory(dirPath)
 
   React.useEffect(() => {
@@ -363,7 +385,7 @@ function ColumnWithLoader({ dirPath, onEntries, quickFilters, showHidden, ...col
     }
   }, [quickFilters, showHidden])
 
-  return <CascadeColumn {...colProps} dirPath={dirPath} extraFilter={extraFilter} />
+  return <CascadeColumn {...colProps} dirPath={dirPath} extraFilter={extraFilter} tagMap={tagMap} />
 }
 
 // ── StackPreviewLoader — loads parent dir, passes siblings to StackPreview ──
@@ -378,25 +400,26 @@ function StackPreviewLoader({ parentPath, selectedPath, onSelect, onEntries }) {
 }
 
 // ── Context menu items builder ───────────────────────────────────────────────
-function buildContextItems(ctxMenu, { togglePin, setShowRename, setCtxMenu, handleDelete }) {
+function buildContextItems(ctxMenu, { togglePin, setShowRename, setCtxMenu, handleDelete, tagMap, toggleTag }) {
   const item = ctxMenu?.item
+  const currentTags = item ? (tagMap[item.path] || []) : []
   return [
     { icon: <IconEye size={12} />, label: 'Open', kbd: '↵', onClick: () => { window.electronAPI?.openExternal(item?.path); setCtxMenu(null) } },
     { icon: <IconWindow size={12} />, label: 'Show in Finder / Explorer', onClick: () => { window.electronAPI?.showInFolder(item?.path); setCtxMenu(null) } },
     { divider: true },
     { icon: <IconPin size={12} />, label: 'Pin column', onClick: () => { if (item) togglePin(item.path); setCtxMenu(null) } },
     { icon: <IconCopy size={12} />, label: 'Copy', kbd: '⌘C' },
-    { icon: <IconShare size={12} />, label: 'Move to…', sub: [
-      { icon: <FileTile kind="folder" size={12} />, label: 'Documents' },
-      { icon: <FileTile kind="folder" size={12} />, label: 'Downloads' },
-    ]},
     { icon: <IconRename size={12} />, label: 'Rename', kbd: 'F2', onClick: () => { setCtxMenu(null); setShowRename(true) } },
-    { icon: <IconTag size={12} />, label: 'Tag', sub: TAGS.map(t => ({
-      icon: <div style={{ width: 8, height: 8, borderRadius: 99, background: `oklch(0.62 0.16 ${t.hue})` }} />,
-      label: t.name,
-    }))},
+    { icon: <IconTag size={12} />, label: 'Tag', sub: TAGS.map(t => {
+      const active = currentTags.includes(t.id)
+      return {
+        icon: <div style={{ width: 8, height: 8, borderRadius: 99, background: `oklch(${active ? '0.55' : '0.82'} 0.16 ${t.hue})` }} />,
+        label: t.name,
+        active,
+        onClick: () => { if (item) toggleTag(item.path, t.id) },
+      }
+    })},
     { divider: true },
-    { icon: <IconStar size={12} />, label: 'Add to Starred' },
     { icon: <IconInfo size={12} />, label: 'Properties', kbd: '⌘I' },
     { divider: true },
     { icon: <IconTrash size={12} />, label: 'Move to Trash', kbd: '⌫', danger: true, onClick: () => { handleDelete(); setCtxMenu(null) } },

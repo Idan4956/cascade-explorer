@@ -6,6 +6,25 @@ import path from 'path'
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
 
+// ── Tag persistence ───────────────────────────────────────────────────────────
+let tagsCache = {}
+const tagsPath = () => path.join(app.getPath('userData'), 'tags.json')
+
+function loadTags() {
+  try { tagsCache = JSON.parse(fs.readFileSync(tagsPath(), 'utf-8')) } catch { tagsCache = {} }
+}
+function saveTags() {
+  try { fs.writeFileSync(tagsPath(), JSON.stringify(tagsCache, null, 2)) } catch {}
+}
+
+ipcMain.handle('tags:getAll', () => tagsCache)
+ipcMain.handle('tags:set', (_, filePath, tagIds) => {
+  if (!tagIds || tagIds.length === 0) delete tagsCache[filePath]
+  else tagsCache[filePath] = tagIds
+  saveTags()
+  return { ok: true }
+})
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1400,
@@ -44,6 +63,7 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  loadTags()
   createWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

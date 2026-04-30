@@ -11,6 +11,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openExternal: (filePath) => ipcRenderer.invoke('fs:openExternal', filePath),
   showInFolder: (filePath) => ipcRenderer.invoke('fs:showInFolder', filePath),
   openDialog: (opts) => ipcRenderer.invoke('fs:openDialog', opts),
+  getAllTags: () => ipcRenderer.invoke('tags:getAll'),
+  setTags: (filePath, tagIds) => ipcRenderer.invoke('tags:set', filePath, tagIds),
   homedir: () => ipcRenderer.invoke('fs:homedir'),
   roots: () => ipcRenderer.invoke('fs:roots'),
   diskUsage: () => ipcRenderer.invoke('fs:diskUsage'),
