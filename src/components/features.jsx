@@ -382,11 +382,13 @@ export function AIActions({ item, accent }) {
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         {actions.map((a, i) => (
-          <button key={i} style={{
-            display: 'flex', alignItems: 'center', gap: 9, padding: '7px 10px', border: '1px solid rgba(0,0,0,0.06)',
-            background: 'rgba(255,255,255,0.5)', borderRadius: 6, cursor: 'pointer', fontSize: 12,
-            color: '#222', textAlign: 'left',
-          }}
+          <button key={i}
+            onClick={() => alert(`"${a.label}" requires an AI backend.\n\nTo enable Smart Actions, connect an API key in settings.`)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 9, padding: '7px 10px', border: '1px solid rgba(0,0,0,0.06)',
+              background: 'rgba(255,255,255,0.5)', borderRadius: 6, cursor: 'pointer', fontSize: 12,
+              color: '#222', textAlign: 'left',
+            }}
             onMouseEnter={(e) => { e.currentTarget.style.background = accent.soft; e.currentTarget.style.borderColor = `${accent.c}33` }}
             onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.5)'; e.currentTarget.style.borderColor = 'rgba(0,0,0,0.06)' }}>
             <span style={{ width: 16, textAlign: 'center' }}>{a.icon}</span>

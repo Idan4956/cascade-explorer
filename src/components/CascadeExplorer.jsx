@@ -334,28 +334,29 @@ function ColumnWithLoader({ dirPath, onEntries, quickFilters, showHidden, ...col
   }, [entries, onEntries])
 
   const extraFilter = React.useMemo(() => {
-    const activeFilters = Object.entries(quickFilters).filter(([, v]) => v).map(([k]) => k)
-    const hasQuick = activeFilters.length > 0
-    const hasHidden = !showHidden
+    const activeKinds = ['image', 'video', 'doc', 'pdf'].filter(k => quickFilters[`kind:${k}`])
+    const hasKind = activeKinds.length > 0
+    const hasSizeBig = !!quickFilters['size:big']
+    const hasToday = !!quickFilters['date:today']
+    const hasWeek = !!quickFilters['date:week']
+    const hideHidden = !showHidden
 
-    if (!hasQuick && !hasHidden) return null
+    if (!hasKind && !hasSizeBig && !hasToday && !hasWeek && !hideHidden) return null
 
     return (e) => {
-      if (!showHidden && e.name.startsWith('.')) return false
-      if (quickFilters['kind:image'] && e.kind !== 'image') return false
-      if (quickFilters['kind:video'] && e.kind !== 'video') return false
-      if (quickFilters['kind:doc'] && e.kind !== 'doc') return false
-      if (quickFilters['kind:pdf'] && e.kind !== 'pdf') return false
-      if (quickFilters['size:big'] && e.sizeBytes < 100 * 1024 * 1024) return false
-      if (quickFilters['date:today']) {
-        const today = new Date().toDateString()
-        const mod = e.modifiedRaw ? new Date(e.modifiedRaw).toDateString() : null
-        if (mod !== today) return false
-      }
-      if (quickFilters['date:week']) {
-        const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
-        const mod = e.modifiedRaw ? new Date(e.modifiedRaw).getTime() : 0
-        if (mod < weekAgo) return false
+      if (hideHidden && e.name.startsWith('.')) return false
+      // Folders always pass kind/size/date filters so navigation stays intact
+      if (!e.isDirectory) {
+        if (hasKind && !activeKinds.includes(e.kind)) return false
+        if (hasSizeBig && e.sizeBytes < 100 * 1024 * 1024) return false
+        if (hasToday) {
+          const mod = e.modifiedRaw ? new Date(e.modifiedRaw).toDateString() : null
+          if (mod !== new Date().toDateString()) return false
+        }
+        if (hasWeek) {
+          const mod = e.modifiedRaw ? new Date(e.modifiedRaw).getTime() : 0
+          if (mod < Date.now() - 7 * 24 * 60 * 60 * 1000) return false
+        }
       }
       return true
     }
