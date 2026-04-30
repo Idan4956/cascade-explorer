@@ -403,30 +403,34 @@ export function AIActions({ item, accent }) {
 
 // ─────────── Storage treemap ───────────
 export function StorageTreemap() {
-  const cats = [
-    { id: 'pictures', label: 'Pictures', size: 142, color: '#7a5e9e' },
-    { id: 'videos', label: 'Videos', size: 98, color: '#3a8db0' },
-    { id: 'documents', label: 'Docs', size: 64, color: '#3d6cc8' },
-    { id: 'music', label: 'Music', size: 52, color: '#e08a3a' },
-    { id: 'apps', label: 'Apps', size: 80, color: '#4a8a6e' },
-    { id: 'other', label: 'Other', size: 24, color: '#8a7a5a' },
-  ]
+  const [disk, setDisk] = React.useState(null)
+
+  React.useEffect(() => {
+    const api = window.electronAPI
+    if (api) api.diskUsage().then(setDisk)
+  }, [])
+
+  if (!disk) return <div style={{ fontSize: 10.5, color: '#aaa' }}>Loading storage…</div>
+
+  const fmt = (bytes) => {
+    const gb = bytes / (1024 ** 3)
+    return gb >= 1 ? `${gb.toFixed(1)} GB` : `${(bytes / (1024 ** 2)).toFixed(0)} MB`
+  }
+
+  const usedPct = disk.total > 0 ? disk.used / disk.total : 0
+  const freePct = 1 - usedPct
+
   return (
     <div>
       <div style={{ display: 'flex', height: 8, borderRadius: 99, overflow: 'hidden', marginBottom: 8 }}>
-        {cats.map(c => (
-          <div key={c.id} title={`${c.label} · ${c.size} GB`} style={{ flex: c.size, background: c.color }} />
-        ))}
+        <div title={`Used · ${fmt(disk.used)}`} style={{ flex: usedPct, background: usedPct > 0.9 ? '#c83a2e' : '#6f4cb3', minWidth: usedPct > 0 ? 4 : 0 }} />
+        <div title={`Free · ${fmt(disk.free)}`} style={{ flex: freePct, background: 'rgba(0,0,0,0.08)' }} />
       </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 10px' }}>
-        {cats.map(c => (
-          <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10.5, color: '#555' }}>
-            <div style={{ width: 7, height: 7, borderRadius: 2, background: c.color }} />
-            <span>{c.label}</span>
-            <span style={{ color: '#888' }}>{c.size}G</span>
-          </div>
-        ))}
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10.5, color: '#666' }}>
+        <span><span style={{ color: '#6f4cb3', fontWeight: 600 }}>●</span> Used {fmt(disk.used)}</span>
+        <span><span style={{ color: '#bbb' }}>●</span> Free {fmt(disk.free)}</span>
       </div>
+      <div style={{ fontSize: 10, color: '#aaa', marginTop: 3 }}>{disk.drive} · {fmt(disk.total)} total</div>
     </div>
   )
 }

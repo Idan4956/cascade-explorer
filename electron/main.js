@@ -3,6 +3,7 @@ import { join } from 'path'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
+import { exec } from 'child_process'
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
 
@@ -170,6 +171,65 @@ ipcMain.handle('fs:openDialog', async (_, opts = {}) => {
 })
 
 ipcMain.handle('fs:homedir', () => os.homedir())
+
+ipcMain.handle('fs:diskUsage', async () => {
+  const homedir = os.homedir()
+  return new Promise((resolve) => {
+    if (process.platform === 'win32') {
+      const drive = homedir.charAt(0) + ':'
+      exec(`wmic logicaldisk where "DeviceID='${drive}'" get Size,FreeSpace /format:value`, (err, stdout) => {
+        if (err) return resolve(null)
+        const free = parseInt(stdout.match(/FreeSpace=(\d+)/)?.[1] || '0')
+        const total = parseInt(stdout.match(/Size=(\d+)/)?.[1] || '0')
+        resolve({ free, total, used: total - free, drive: drive + '\\' })
+      })
+    } else {
+      exec(`df -k "${homedir}"`, (err, stdout) => {
+        if (err) return resolve(null)
+        const parts = stdout.trim().split('\n').pop().trim().split(/\s+/)
+        const total = parseInt(parts[1]) * 1024
+        const used = parseInt(parts[2]) * 1024
+        const free = parseInt(parts[3]) * 1024
+        resolve({ free, total, used, drive: '/' })
+      })
+    }
+  })
+})
+
+ipcMain.handle('fs:search', async (_, query, rootDir, maxDepth = 4) => {
+  const results = []
+  const q = query.toLowerCase()
+
+  async function scan(dir, depth) {
+    if (depth > maxDepth || results.length >= 50) return
+    try {
+      const entries = await fs.promises.readdir(dir, { withFileTypes: true })
+      for (const entry of entries) {
+        if (results.length >= 50) return
+        if (entry.name.startsWith('.')) continue
+        const fullPath = path.join(dir, entry.name)
+        if (entry.name.toLowerCase().includes(q)) {
+          try {
+            const stat = await fs.promises.stat(fullPath)
+            results.push({
+              name: entry.name, path: fullPath,
+              isDirectory: entry.isDirectory(),
+              size: stat.size, modified: stat.mtime.toISOString(),
+              kind: getKind(entry.name, entry.isDirectory()),
+              parentDir: dir,
+            })
+          } catch {}
+        }
+        if (entry.isDirectory() && depth < maxDepth) {
+          await scan(fullPath, depth + 1)
+        }
+      }
+    } catch {}
+  }
+
+  await scan(rootDir, 0)
+  return results
+})
 
 ipcMain.handle('fs:roots', () => {
   if (process.platform === 'win32') {

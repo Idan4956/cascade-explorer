@@ -13,6 +13,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openDialog: (opts) => ipcRenderer.invoke('fs:openDialog', opts),
   homedir: () => ipcRenderer.invoke('fs:homedir'),
   roots: () => ipcRenderer.invoke('fs:roots'),
+  diskUsage: () => ipcRenderer.invoke('fs:diskUsage'),
+  search: (query, rootDir, maxDepth) => ipcRenderer.invoke('fs:search', query, rootDir, maxDepth),
 
   // Window controls
   minimize: () => ipcRenderer.send('window:minimize'),

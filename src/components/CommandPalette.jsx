@@ -24,21 +24,44 @@ export default function CommandPalette({ onClose, cascade, setCascade, setShowSh
   }
 
   const ql = q.toLowerCase()
+  const [fsResults, setFsResults] = React.useState([])
+  const [searching, setSearching] = React.useState(false)
 
-  // Gather all loaded filesystem entries to search through
-  const allFiles = React.useMemo(() => {
+  // Cached results from already-visited folders (instant)
+  const cachedFiles = React.useMemo(() => {
     const result = []
     for (const [dir, entries] of Object.entries(loadedDirs)) {
-      for (const entry of entries) {
-        result.push({ ...entry, parentDir: dir })
-      }
+      for (const entry of entries) result.push({ ...entry, parentDir: dir })
     }
     return result
   }, [loadedDirs])
 
-  const matched = ql
-    ? allFiles.filter(e => e.name.toLowerCase().includes(ql)).slice(0, 8)
-    : allFiles.filter(e => e.kind !== 'folder').slice(0, 8)
+  // Live filesystem search for queries 2+ chars
+  React.useEffect(() => {
+    if (ql.length < 2) { setFsResults([]); return }
+    const api = window.electronAPI
+    if (!api) return
+    const rootDir = cascade[0]
+    if (!rootDir) return
+    setSearching(true)
+    let cancelled = false
+    api.search(ql, rootDir, 4).then(results => {
+      if (!cancelled) { setFsResults(results || []); setSearching(false) }
+    })
+    return () => { cancelled = true }
+  }, [ql, cascade])
+
+  // Merge: filesystem results first, then fill from cache, dedupe by path
+  const matched = React.useMemo(() => {
+    if (!ql) return cachedFiles.filter(e => e.kind !== 'folder').slice(0, 8)
+    const seen = new Set()
+    const merged = []
+    for (const e of [...fsResults, ...cachedFiles.filter(e => e.name.toLowerCase().includes(ql))]) {
+      if (!seen.has(e.path)) { seen.add(e.path); merged.push(e) }
+      if (merged.length >= 12) break
+    }
+    return merged
+  }, [ql, fsResults, cachedFiles])
 
   const commands = [
     { id: 'cmd-new-folder', name: 'New folder', kbd: '⌘N', icon: <IconPlus size={13} />, run: handleNewFolder },
@@ -97,7 +120,7 @@ export default function CommandPalette({ onClose, cascade, setCascade, setShowSh
           )}
 
           {matched.length > 0 && (
-            <PaletteSection title={ql ? 'Files' : 'Recent files'}>
+            <PaletteSection title={ql ? (searching ? 'Files (searching…)' : 'Files') : 'Recent files'}>
               {matched.map(entry => (
                 <PaletteRow
                   key={entry.path}

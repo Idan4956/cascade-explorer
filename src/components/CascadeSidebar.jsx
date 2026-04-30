@@ -3,14 +3,14 @@ import { IconHome, IconClock, IconStar, IconCommand, FileTile, kindLabel } from 
 import { StorageTreemap, TAGS } from './features'
 
 const SMART_FOLDERS = [
-  { id: 'sf-recent', name: 'Recent', icon: '🕐' },
-  { id: 'sf-images', name: 'All images', icon: '🖼' },
-  { id: 'sf-large', name: 'Large files', icon: '📦' },
-  { id: 'sf-screenshots', name: 'Screenshots', icon: '📸' },
-  { id: 'sf-untagged', name: 'Untagged', icon: '🏷' },
+  { id: 'sf-recent',      name: 'Recent',      icon: '🕐', filter: { 'date:week': true } },
+  { id: 'sf-images',      name: 'All images',  icon: '🖼', filter: { 'kind:image': true } },
+  { id: 'sf-large',       name: 'Large files', icon: '📦', filter: { 'size:big': true } },
+  { id: 'sf-screenshots', name: 'Screenshots', icon: '📸', filter: { 'date:week': true }, nameFilter: 'screenshot' },
+  { id: 'sf-docs',        name: 'Documents',   icon: '📄', filter: { 'kind:doc': true, 'kind:pdf': true } },
 ]
 
-export default function CascadeSidebar({ cascade, homedir, places, onJump, accent, setShowShortcuts }) {
+export default function CascadeSidebar({ cascade, homedir, places, onJump, accent, setShowShortcuts, onSmartFolder }) {
   const activePath = cascade[cascade.length - 1]
 
   const sections = [
@@ -18,7 +18,7 @@ export default function CascadeSidebar({ cascade, homedir, places, onJump, accen
       title: 'Quick',
       items: [
         { id: 'home', name: 'Home', icon: <IconHome size={13} />, path: homedir ? [homedir] : null },
-        { id: 'recent', name: 'Recent', icon: <IconClock size={13} />, path: null },
+        { id: 'recent', name: 'Recent', icon: <IconClock size={13} />, path: null, smartFolder: SMART_FOLDERS[0] },
         { id: 'starred', name: 'Starred', icon: <IconStar size={13} />, path: null },
       ],
     },
@@ -38,6 +38,7 @@ export default function CascadeSidebar({ cascade, homedir, places, onJump, accen
         name: s.name,
         icon: <span style={{ fontSize: 12 }}>{s.icon}</span>,
         path: null,
+        smartFolder: s,
       })),
     },
     {
@@ -68,17 +69,22 @@ export default function CascadeSidebar({ cascade, homedir, places, onJump, accen
           </div>
           {sec.items.map(it => {
             const active = activePath === it.id || activePath === it.path?.[0]
+            const clickable = it.path || it.smartFolder
+            const handleClick = () => {
+              if (it.smartFolder) { onSmartFolder(it.smartFolder); if (homedir) onJump([homedir]) }
+              else if (it.path) onJump(it.path)
+            }
             return (
-              <button key={it.id} onClick={() => it.path && onJump(it.path)} style={{
+              <button key={it.id} onClick={handleClick} style={{
                 display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 6,
                 border: 'none', background: active ? accent.soft : 'transparent',
-                fontSize: 12, cursor: it.path ? 'pointer' : 'default',
+                fontSize: 12, cursor: clickable ? 'pointer' : 'default',
                 color: active ? accent.c : '#333',
                 fontWeight: active ? 600 : 400,
                 width: '100%', textAlign: 'left',
-                opacity: it.path ? 1 : 0.55,
+                opacity: clickable ? 1 : 0.45,
               }}
-                onMouseEnter={(e) => it.path && !active && (e.currentTarget.style.background = 'rgba(0,0,0,0.04)')}
+                onMouseEnter={(e) => clickable && !active && (e.currentTarget.style.background = 'rgba(0,0,0,0.04)')}
                 onMouseLeave={(e) => !active && (e.currentTarget.style.background = 'transparent')}>
                 {it.icon || (
                   <div style={{ width: 8, height: 8, borderRadius: 99, background: `oklch(0.62 0.16 ${it.hue})`, marginLeft: 2, marginRight: 2 }} />

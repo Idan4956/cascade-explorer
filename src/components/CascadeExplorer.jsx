@@ -236,6 +236,7 @@ export default function CascadeExplorer({ homedir, accent = 'purple' }) {
           onJump={navigateTo}
           accent={A}
           setShowShortcuts={setShowShortcuts}
+          onSmartFolder={(sf) => setQuickFilters(sf.filter || {})}
         />
 
         {/* Column scroll area */}
