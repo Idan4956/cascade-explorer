@@ -252,27 +252,38 @@ export function QuickFilters({ filters, setFilters, accent }) {
     { id: 'date:week', label: 'This week' },
     { id: 'size:big', label: '> 100 MB' },
   ]
+  const anyActive = Object.values(filters).some(Boolean)
+  const activeLabels = chips.filter(c => filters[c.id]).map(c => c.label).join(', ')
+
   return (
-    <div style={{ display: 'flex', gap: 6, padding: '6px 14px', borderBottom: '1px solid rgba(0,0,0,0.05)', overflow: 'auto', background: 'rgba(252,251,253,0.5)', flexShrink: 0 }}>
-      {chips.map(c => {
-        const active = filters[c.id]
-        return (
-          <button key={c.id} onClick={() => setFilters({ ...filters, [c.id]: !active })} style={{
-            height: 24, padding: '0 11px', borderRadius: 99,
-            border: active ? `1px solid ${accent.c}` : '1px solid rgba(0,0,0,0.1)',
-            background: active ? accent.soft : 'transparent',
-            color: active ? accent.c : '#444', fontSize: 11.5, fontWeight: active ? 600 : 400,
-            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap',
-          }}>
-            {c.icon}
-            {c.label}
-          </button>
-        )
-      })}
-      <div style={{ flex: 1 }} />
-      <button style={{ height: 24, padding: '0 10px', borderRadius: 99, border: '1px dashed rgba(0,0,0,0.18)', background: 'transparent', color: '#666', fontSize: 11.5, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
-        <IconPlus size={10} /> Save as Smart Folder
-      </button>
+    <div style={{ flexShrink: 0, borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+      {anyActive && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 14px', background: accent.tint, fontSize: 11.5 }}>
+          <span style={{ color: accent.c, fontWeight: 600 }}>Filtering: {activeLabels}</span>
+          <button onClick={() => setFilters({})} style={{
+            marginLeft: 'auto', height: 20, padding: '0 8px', borderRadius: 99,
+            border: `1px solid ${accent.c}`, background: 'transparent',
+            color: accent.c, fontSize: 11, cursor: 'pointer', fontWeight: 600,
+          }}>✕ Clear</button>
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 6, padding: '6px 14px', overflow: 'auto', background: 'rgba(252,251,253,0.5)' }}>
+        {chips.map(c => {
+          const active = filters[c.id]
+          return (
+            <button key={c.id} onClick={() => setFilters({ ...filters, [c.id]: !active })} style={{
+              height: 24, padding: '0 11px', borderRadius: 99,
+              border: active ? `1px solid ${accent.c}` : '1px solid rgba(0,0,0,0.1)',
+              background: active ? accent.soft : 'transparent',
+              color: active ? accent.c : '#444', fontSize: 11.5, fontWeight: active ? 600 : 400,
+              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap',
+            }}>
+              {c.icon}
+              {c.label}
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }

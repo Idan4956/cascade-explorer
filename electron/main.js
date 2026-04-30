@@ -3,7 +3,6 @@ import { join } from 'path'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
-import { exec } from 'child_process'
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
 
@@ -174,26 +173,16 @@ ipcMain.handle('fs:homedir', () => os.homedir())
 
 ipcMain.handle('fs:diskUsage', async () => {
   const homedir = os.homedir()
-  return new Promise((resolve) => {
-    if (process.platform === 'win32') {
-      const drive = homedir.charAt(0) + ':'
-      exec(`wmic logicaldisk where "DeviceID='${drive}'" get Size,FreeSpace /format:value`, (err, stdout) => {
-        if (err) return resolve(null)
-        const free = parseInt(stdout.match(/FreeSpace=(\d+)/)?.[1] || '0')
-        const total = parseInt(stdout.match(/Size=(\d+)/)?.[1] || '0')
-        resolve({ free, total, used: total - free, drive: drive + '\\' })
-      })
-    } else {
-      exec(`df -k "${homedir}"`, (err, stdout) => {
-        if (err) return resolve(null)
-        const parts = stdout.trim().split('\n').pop().trim().split(/\s+/)
-        const total = parseInt(parts[1]) * 1024
-        const used = parseInt(parts[2]) * 1024
-        const free = parseInt(parts[3]) * 1024
-        resolve({ free, total, used, drive: '/' })
-      })
-    }
-  })
+  try {
+    const stats = await fs.promises.statfs(homedir)
+    const total = stats.blocks * stats.bsize
+    const free = stats.bavail * stats.bsize
+    const used = total - free
+    const drive = process.platform === 'win32' ? homedir.slice(0, 3) : '/'
+    return { free, total, used, drive }
+  } catch {
+    return null
+  }
 })
 
 ipcMain.handle('fs:search', async (_, query, rootDir, maxDepth = 4) => {

@@ -19,7 +19,7 @@ export default function CascadeSidebar({ cascade, homedir, places, onJump, accen
       items: [
         { id: 'home', name: 'Home', icon: <IconHome size={13} />, path: homedir ? [homedir] : null },
         { id: 'recent', name: 'Recent', icon: <IconClock size={13} />, path: null, smartFolder: SMART_FOLDERS[0] },
-        { id: 'starred', name: 'Starred', icon: <IconStar size={13} />, path: null },
+        { id: 'starred', name: 'Starred (coming soon)', icon: <IconStar size={13} />, path: null },
       ],
     },
     {
