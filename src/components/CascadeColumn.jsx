@@ -29,7 +29,7 @@ export default function CascadeColumn({
         const cmp = a.name.toLowerCase().localeCompare(b.name.toLowerCase())
         return sortDir === 'asc' ? cmp : -cmp
       })
-  }, [entries, filterText, sortDir])
+  }, [entries, filterText, sortDir, extraFilter])
 
   return (
     <div style={{
