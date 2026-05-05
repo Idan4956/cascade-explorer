@@ -409,20 +409,17 @@ function ColumnWithLoader({ dirPath, onEntries, quickFilters, showHidden, tagMap
 
     return (e) => {
       if (hideHidden && e.name.startsWith('.')) return false
-      // Folders always pass kind/size/date/tag filters so navigation stays intact
-      if (!e.isDirectory) {
-        if (hasKind && !activeKinds.includes(e.kind)) return false
-        if (hasSizeBig && e.sizeBytes < 100 * 1024 * 1024) return false
-        if (hasToday) {
-          const mod = e.modifiedRaw ? new Date(e.modifiedRaw).toDateString() : null
-          if (mod !== new Date().toDateString()) return false
-        }
-        if (hasWeek) {
-          const mod = e.modifiedRaw ? new Date(e.modifiedRaw).getTime() : 0
-          if (mod < Date.now() - 7 * 24 * 60 * 60 * 1000) return false
-        }
-        if (activeTagFilter && !(tagMap?.[e.path] || []).includes(activeTagFilter)) return false
+      if (hasKind && !activeKinds.includes(e.kind)) return false
+      if (hasSizeBig && (e.isDirectory || e.sizeBytes < 100 * 1024 * 1024)) return false
+      if (hasToday) {
+        const mod = e.modifiedRaw ? new Date(e.modifiedRaw).toDateString() : null
+        if (mod !== new Date().toDateString()) return false
       }
+      if (hasWeek) {
+        const mod = e.modifiedRaw ? new Date(e.modifiedRaw).getTime() : 0
+        if (mod < Date.now() - 7 * 24 * 60 * 60 * 1000) return false
+      }
+      if (activeTagFilter && !(tagMap?.[e.path] || []).includes(activeTagFilter)) return false
       return true
     }
   }, [quickFilters, showHidden, activeTagFilter, tagMap])
