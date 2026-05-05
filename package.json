@@ -29,8 +29,15 @@
     "files": [
       "out/**"
     ],
+    "extraFiles": [
+      {
+        "from": "node_modules/electron/dist/ffmpeg.dll",
+        "to": "ffmpeg.dll",
+        "filter": ["**/*"]
+      }
+    ],
     "win": {
-      "target": "nsis"
+      "target": ["nsis", "zip"]
     },
     "mac": {
       "target": "dmg"
