@@ -8,10 +8,13 @@ const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
 
 // ── Tag persistence ───────────────────────────────────────────────────────────
 let tagsCache = {}
+let tagDefsCache = null
 const tagsPath = () => path.join(app.getPath('userData'), 'tags.json')
+const tagDefsPath = () => path.join(app.getPath('userData'), 'tag-defs.json')
 
 function loadTags() {
   try { tagsCache = JSON.parse(fs.readFileSync(tagsPath(), 'utf-8')) } catch { tagsCache = {} }
+  try { tagDefsCache = JSON.parse(fs.readFileSync(tagDefsPath(), 'utf-8')) } catch { tagDefsCache = null }
 }
 function saveTags() {
   try { fs.writeFileSync(tagsPath(), JSON.stringify(tagsCache, null, 2)) } catch {}
@@ -22,6 +25,12 @@ ipcMain.handle('tags:set', (_, filePath, tagIds) => {
   if (!tagIds || tagIds.length === 0) delete tagsCache[filePath]
   else tagsCache[filePath] = tagIds
   saveTags()
+  return { ok: true }
+})
+ipcMain.handle('tags:getDefs', () => tagDefsCache)
+ipcMain.handle('tags:setDefs', (_, defs) => {
+  tagDefsCache = defs
+  try { fs.writeFileSync(tagDefsPath(), JSON.stringify(defs, null, 2)) } catch {}
   return { ok: true }
 })
 

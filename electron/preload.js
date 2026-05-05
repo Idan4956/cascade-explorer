@@ -13,6 +13,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openDialog: (opts) => ipcRenderer.invoke('fs:openDialog', opts),
   getAllTags: () => ipcRenderer.invoke('tags:getAll'),
   setTags: (filePath, tagIds) => ipcRenderer.invoke('tags:set', filePath, tagIds),
+  getTagDefs: () => ipcRenderer.invoke('tags:getDefs'),
+  setTagDefs: (defs) => ipcRenderer.invoke('tags:setDefs', defs),
   homedir: () => ipcRenderer.invoke('fs:homedir'),
   roots: () => ipcRenderer.invoke('fs:roots'),
   diskUsage: () => ipcRenderer.invoke('fs:diskUsage'),

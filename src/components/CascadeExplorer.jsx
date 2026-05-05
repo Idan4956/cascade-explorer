@@ -6,10 +6,9 @@ import CascadeDeepPreview from './CascadeDeepPreview'
 import CascadeStatusBar from './CascadeStatusBar'
 import CommandPalette from './CommandPalette'
 import { CompareView, StackPreview as StackPreviewPanel } from './CompareAndStack'
-import { QuickFilters, SelectionBar, BatchRenameModal, ShortcutsModal, ContextMenu } from './features'
-import { FileTile, IconEye, IconCopy, IconShare, IconRename, IconTag, IconTrash, IconInfo, IconStar, IconPin, IconWindow } from './icons'
+import { QuickFilters, SelectionBar, BatchRenameModal, ShortcutsModal, ContextMenu, TAGS as DEFAULT_TAGS } from './features'
+import { FileTile, IconEye, IconCopy, IconRename, IconTag, IconTrash, IconInfo, IconPin, IconWindow } from './icons'
 import { useSidebarSections, useDirectory } from '../hooks/useDirectory'
-import { TAGS } from './features'
 
 const ACCENTS = {
   purple: { c: '#6f4cb3', soft: 'rgba(111,76,179,.14)', tint: 'rgba(111,76,179,.06)' },
@@ -61,11 +60,47 @@ export default function CascadeExplorer({ homedir, accent = 'purple' }) {
 
   // ── Tag map: { [filePath]: string[] } loaded from disk ───────
   const [tagMap, setTagMap] = React.useState({})
+  const [tagDefs, setTagDefs] = React.useState(DEFAULT_TAGS)
+  const [activeTagFilter, setActiveTagFilter] = React.useState(null)
 
   React.useEffect(() => {
     const api = window.electronAPI
-    if (api) api.getAllTags().then(t => setTagMap(t || {}))
+    if (!api) return
+    api.getAllTags().then(t => setTagMap(t || {}))
+    api.getTagDefs().then(d => { if (d) setTagDefs(d) })
   }, [])
+
+  const saveTagDefs = React.useCallback((defs) => {
+    setTagDefs(defs)
+    window.electronAPI?.setTagDefs(defs)
+  }, [])
+
+  const addTag = React.useCallback((name, hue) => {
+    setTagDefs(prev => {
+      const defs = [...prev, { id: `tag-${Date.now()}`, name, hue }]
+      window.electronAPI?.setTagDefs(defs)
+      return defs
+    })
+  }, [])
+
+  const deleteTag = React.useCallback((tagId) => {
+    setTagDefs(prev => {
+      const defs = prev.filter(t => t.id !== tagId)
+      window.electronAPI?.setTagDefs(defs)
+      return defs
+    })
+    // Remove from all files
+    setTagMap(prev => {
+      const next = {}
+      for (const [path, tags] of Object.entries(prev)) {
+        const filtered = tags.filter(t => t !== tagId)
+        if (filtered.length > 0) next[path] = filtered
+      }
+      window.electronAPI?.setTags && Object.entries(next).forEach(([p, t]) => window.electronAPI.setTags(p, t))
+      return next
+    })
+    if (activeTagFilter === tagId) setActiveTagFilter(null)
+  }, [activeTagFilter])
 
   const toggleTag = React.useCallback((filePath, tagId) => {
     setTagMap(prev => {
@@ -257,6 +292,11 @@ export default function CascadeExplorer({ homedir, accent = 'purple' }) {
           accent={A}
           setShowShortcuts={setShowShortcuts}
           onSmartFolder={(sf) => setQuickFilters(sf.filter || {})}
+          tagDefs={tagDefs}
+          activeTagFilter={activeTagFilter}
+          onTagFilter={(id) => setActiveTagFilter(prev => prev === id ? null : id)}
+          onAddTag={addTag}
+          onDeleteTag={deleteTag}
         />
 
         {/* Column scroll area */}
@@ -278,6 +318,7 @@ export default function CascadeExplorer({ homedir, accent = 'purple' }) {
               quickFilters={quickFilters}
               showHidden={showHidden}
               tagMap={tagMap}
+              activeTagFilter={activeTagFilter}
             />
           ))}
 
@@ -294,7 +335,7 @@ export default function CascadeExplorer({ homedir, accent = 'purple' }) {
           ) : lastSelItems.length > 1 ? (
             <CompareView items={lastSelItems} accent={A} />
           ) : (
-            <CascadeDeepPreview item={previewItem} accent={A} tagMap={tagMap} onToggleTag={toggleTag} />
+            <CascadeDeepPreview item={previewItem} accent={A} tagMap={tagMap} onToggleTag={toggleTag} tagDefs={tagDefs} />
           )}
 
           <SelectionBar
@@ -340,7 +381,7 @@ export default function CascadeExplorer({ homedir, accent = 'purple' }) {
           onClose={() => setCtxMenu(null)}
           items={buildContextItems(ctxMenu, {
             togglePin, setShowRename, setCtxMenu, handleDelete,
-            tagMap, toggleTag,
+            tagMap, toggleTag, tagDefs,
           })}
         />
       )}
@@ -349,7 +390,7 @@ export default function CascadeExplorer({ homedir, accent = 'purple' }) {
 }
 
 // ── ColumnWithLoader — bridges useDirectory into CascadeColumn ──────────────
-function ColumnWithLoader({ dirPath, onEntries, quickFilters, showHidden, tagMap, ...colProps }) {
+function ColumnWithLoader({ dirPath, onEntries, quickFilters, showHidden, tagMap, activeTagFilter, ...colProps }) {
   const { entries } = useDirectory(dirPath)
 
   React.useEffect(() => {
@@ -364,11 +405,11 @@ function ColumnWithLoader({ dirPath, onEntries, quickFilters, showHidden, tagMap
     const hasWeek = !!quickFilters['date:week']
     const hideHidden = !showHidden
 
-    if (!hasKind && !hasSizeBig && !hasToday && !hasWeek && !hideHidden) return null
+    if (!hasKind && !hasSizeBig && !hasToday && !hasWeek && !hideHidden && !activeTagFilter) return null
 
     return (e) => {
       if (hideHidden && e.name.startsWith('.')) return false
-      // Folders always pass kind/size/date filters so navigation stays intact
+      // Folders always pass kind/size/date/tag filters so navigation stays intact
       if (!e.isDirectory) {
         if (hasKind && !activeKinds.includes(e.kind)) return false
         if (hasSizeBig && e.sizeBytes < 100 * 1024 * 1024) return false
@@ -380,10 +421,11 @@ function ColumnWithLoader({ dirPath, onEntries, quickFilters, showHidden, tagMap
           const mod = e.modifiedRaw ? new Date(e.modifiedRaw).getTime() : 0
           if (mod < Date.now() - 7 * 24 * 60 * 60 * 1000) return false
         }
+        if (activeTagFilter && !(tagMap?.[e.path] || []).includes(activeTagFilter)) return false
       }
       return true
     }
-  }, [quickFilters, showHidden])
+  }, [quickFilters, showHidden, activeTagFilter, tagMap])
 
   return <CascadeColumn {...colProps} dirPath={dirPath} extraFilter={extraFilter} tagMap={tagMap} />
 }
@@ -400,7 +442,7 @@ function StackPreviewLoader({ parentPath, selectedPath, onSelect, onEntries }) {
 }
 
 // ── Context menu items builder ───────────────────────────────────────────────
-function buildContextItems(ctxMenu, { togglePin, setShowRename, setCtxMenu, handleDelete, tagMap, toggleTag }) {
+function buildContextItems(ctxMenu, { togglePin, setShowRename, setCtxMenu, handleDelete, tagMap, toggleTag, tagDefs }) {
   const item = ctxMenu?.item
   const currentTags = item ? (tagMap[item.path] || []) : []
   return [
@@ -408,9 +450,8 @@ function buildContextItems(ctxMenu, { togglePin, setShowRename, setCtxMenu, hand
     { icon: <IconWindow size={12} />, label: 'Show in Finder / Explorer', onClick: () => { window.electronAPI?.showInFolder(item?.path); setCtxMenu(null) } },
     { divider: true },
     { icon: <IconPin size={12} />, label: 'Pin column', onClick: () => { if (item) togglePin(item.path); setCtxMenu(null) } },
-    { icon: <IconCopy size={12} />, label: 'Copy', kbd: '⌘C' },
     { icon: <IconRename size={12} />, label: 'Rename', kbd: 'F2', onClick: () => { setCtxMenu(null); setShowRename(true) } },
-    { icon: <IconTag size={12} />, label: 'Tag', sub: TAGS.map(t => {
+    { icon: <IconTag size={12} />, label: 'Tag', sub: (tagDefs || []).map(t => {
       const active = currentTags.includes(t.id)
       return {
         icon: <div style={{ width: 8, height: 8, borderRadius: 99, background: `oklch(${active ? '0.55' : '0.82'} 0.16 ${t.hue})` }} />,
