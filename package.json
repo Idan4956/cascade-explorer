@@ -23,6 +23,7 @@
   "build": {
     "appId": "com.cascade.fileexplorer",
     "productName": "Cascade",
+    "publish": null,
     "directories": {
       "output": "release"
     },
