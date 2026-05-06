@@ -42,6 +42,7 @@ jobs:
         run: npm run package
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
+          ELECTRON_BUILDER_CACHE: /tmp/eb-cache
 
       - name: Upload Windows build
         if: matrix.os == 'windows-latest'
@@ -53,7 +54,7 @@ jobs:
         if: matrix.os == 'macos-latest'
         uses: softprops/action-gh-release@v1
         with:
-          files: release/*.dmg
+          files: release/*.zip
 
       - name: Upload Linux build
         if: matrix.os == 'ubuntu-latest'

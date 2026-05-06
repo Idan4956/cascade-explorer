@@ -40,7 +40,7 @@
       ]
     },
     "mac": {
-      "target": "dmg",
+      "target": "zip",
       "category": "public.app-category.utilities"
     },
     "linux": {
