@@ -15,10 +15,16 @@ jobs:
         include:
           - os: windows-latest
             platform: Windows
+            eb_args: --win zip
+            artifact: release/*.zip
           - os: macos-latest
             platform: macOS
+            eb_args: --mac zip
+            artifact: release/*.zip
           - os: ubuntu-latest
             platform: Linux
+            eb_args: --linux tar.gz
+            artifact: release/*.tar.gz
 
     runs-on: ${{ matrix.os }}
     name: Build for ${{ matrix.platform }}
@@ -31,7 +37,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
 
       - name: Install dependencies
         run: npm install
@@ -40,28 +45,17 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get install -y rpm fakeroot
 
-      - name: Build and package
-        run: npm run package
+      - name: Build JS
+        run: npm run build
+
+      - name: Package app
+        run: ./node_modules/.bin/electron-builder ${{ matrix.eb_args }} --publish=never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
-          ELECTRON_BUILDER_CACHE: /tmp/eb-cache
           GITHUB_TOKEN: ""
           GH_TOKEN: ""
 
-      - name: Upload Windows build
-        if: matrix.os == 'windows-latest'
+      - name: Upload to release
         uses: softprops/action-gh-release@v1
         with:
-          files: release/*.zip
-
-      - name: Upload macOS build
-        if: matrix.os == 'macos-latest'
-        uses: softprops/action-gh-release@v1
-        with:
-          files: release/*.zip
-
-      - name: Upload Linux build
-        if: matrix.os == 'ubuntu-latest'
-        uses: softprops/action-gh-release@v1
-        with:
-          files: release/*.tar.gz
+          files: ${{ matrix.artifact }}
