@@ -25,6 +25,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
 
       - uses: actions/setup-node@v4
         with:
@@ -43,6 +45,7 @@ jobs:
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
           ELECTRON_BUILDER_CACHE: /tmp/eb-cache
+          GH_TOKEN: ""
 
       - name: Upload Windows build
         if: matrix.os == 'windows-latest'
