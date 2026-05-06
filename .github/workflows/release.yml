@@ -4,6 +4,9 @@ on:
   release:
     types: [published]
 
+permissions:
+  contents: write
+
 jobs:
   build:
     strategy:
@@ -29,23 +32,32 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: Install Linux build deps
         if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get install -y rpm fakeroot
 
-      - name: Build and package
-        run: npm run package
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build app
+        run: npm run build
 
-      - name: Upload artifacts to release
-        uses: softprops/action-gh-release@v2
+      - name: Package app
+        run: npx electron-builder --publish never
+
+      - name: Upload Windows build
+        if: matrix.os == 'windows-latest'
+        uses: softprops/action-gh-release@v1
         with:
-          files: |
-            release/*.zip
-            release/*.dmg
-            release/*.AppImage
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          files: release/*.zip
+
+      - name: Upload macOS build
+        if: matrix.os == 'macos-latest'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: release/*.dmg
+
+      - name: Upload Linux build
+        if: matrix.os == 'ubuntu-latest'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: release/*.AppImage
