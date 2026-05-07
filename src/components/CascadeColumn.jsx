@@ -1,7 +1,6 @@
 import React from 'react'
 import { useDirectory } from '../hooks/useDirectory'
-import { FileTile, kindLabel, IconFilter, IconChevronUp, IconChevronDown, IconChevronRight, IconPin } from './icons'
-import { TAGS } from './features'
+import { FileTile, IconFilter, IconChevronUp, IconChevronDown, IconChevronRight, IconPin } from './icons'
 
 export default function CascadeColumn({
   dirPath,
@@ -20,6 +19,35 @@ export default function CascadeColumn({
   const { entries, loading, error, refresh } = useDirectory(dirPath)
   const [showFilter, setShowFilter] = React.useState(false)
   const [sortDir, setSortDir] = React.useState('asc')
+  const [creating, setCreating] = React.useState(null) // 'file' | 'folder'
+  const [newName, setNewName] = React.useState('')
+  const [showNewMenu, setShowNewMenu] = React.useState(false)
+  const newInputRef = React.useRef(null)
+
+  React.useEffect(() => {
+    if (creating && newInputRef.current) newInputRef.current.focus()
+  }, [creating])
+
+  const startCreating = (type) => {
+    setShowNewMenu(false)
+    setCreating(type)
+    setNewName(type === 'folder' ? 'New Folder' : 'New File.txt')
+  }
+
+  const confirmCreate = async () => {
+    const name = newName.trim()
+    if (!name) { setCreating(null); return }
+    const sep = dirPath.includes('\\') ? '\\' : '/'
+    const fullPath = dirPath.replace(/[\\/]$/, '') + sep + name
+    const api = window.electronAPI
+    if (creating === 'folder') await api?.mkdir(fullPath)
+    else await api?.createFile(fullPath)
+    setCreating(null)
+    setNewName('')
+    refresh()
+  }
+
+  const cancelCreate = () => { setCreating(null); setNewName('') }
 
   const filtered = React.useMemo(() => {
     return entries
@@ -52,6 +80,31 @@ export default function CascadeColumn({
         <span style={{ flex: 1 }}>
           {loading ? '…' : error ? '!' : `${filtered.length} of ${entries.length}`}
         </span>
+        <div style={{ position: 'relative' }}>
+          <HeaderBtn onClick={() => setShowNewMenu(v => !v)} title="New file or folder" active={showNewMenu}>
+            <span style={{ fontSize: 13, lineHeight: 1 }}>+</span>
+          </HeaderBtn>
+          {showNewMenu && (
+            <div style={{
+              position: 'absolute', top: 22, right: 0, zIndex: 100,
+              background: '#fff', border: '1px solid rgba(0,0,0,0.1)',
+              borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+              overflow: 'hidden', minWidth: 130,
+            }}>
+              {[['folder','📁','New Folder'],['file','📄','New File']].map(([type, icon, label]) => (
+                <button key={type} onClick={() => startCreating(type)} style={{
+                  width: '100%', padding: '8px 12px', border: 'none',
+                  background: 'transparent', textAlign: 'left',
+                  fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, color: '#222',
+                }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.05)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                  <span>{icon}</span>{label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <HeaderBtn active={showFilter} onClick={() => setShowFilter(v => !v)} title="Filter column">
           <IconFilter size={10} />
         </HeaderBtn>
@@ -81,7 +134,26 @@ export default function CascadeColumn({
       )}
 
       {/* Items list */}
-      <div style={{ flex: 1, overflow: 'auto', padding: 4 }}>
+      <div style={{ flex: 1, overflow: 'auto', padding: 4 }} onClick={() => setShowNewMenu(false)}>
+        {/* Inline creation row */}
+        {creating && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 6px', marginBottom: 2 }}>
+            <FileTile kind={creating === 'folder' ? 'folder' : 'file'} size={18} />
+            <input
+              ref={newInputRef}
+              value={newName}
+              onChange={e => setNewName(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') confirmCreate(); if (e.key === 'Escape') cancelCreate() }}
+              onBlur={confirmCreate}
+              style={{
+                flex: 1, height: 24, padding: '0 7px',
+                border: '1px solid rgba(111,76,179,0.5)', borderRadius: 4,
+                fontSize: 12, outline: 'none', background: '#fff',
+              }}
+            />
+          </div>
+        )}
+
         {error && (
           <div style={{ padding: '12px 10px', fontSize: 11.5, color: '#c83a2e', textAlign: 'center' }}>
             {error.includes('EACCES') ? 'Permission denied' : error.includes('ENOENT') ? 'Folder not found' : 'Cannot read folder'}

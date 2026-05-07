@@ -176,6 +176,15 @@ ipcMain.handle('fs:mkdir', async (_, dirPath) => {
   }
 })
 
+ipcMain.handle('fs:createFile', async (_, filePath) => {
+  try {
+    await fs.promises.writeFile(filePath, '', { flag: 'wx' })
+    return { ok: true }
+  } catch (err) {
+    return { error: err.message }
+  }
+})
+
 ipcMain.handle('fs:openExternal', async (_, filePath) => {
   try {
     await shell.openPath(filePath)
