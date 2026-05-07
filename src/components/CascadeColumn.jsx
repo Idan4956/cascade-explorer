@@ -1,6 +1,6 @@
 import React from 'react'
 import { useDirectory } from '../hooks/useDirectory'
-import { FileTile, IconFilter, IconChevronUp, IconChevronDown, IconChevronRight, IconPin, IconTrash } from './icons'
+import { FileTile, IconFilter, IconChevronUp, IconChevronDown, IconChevronRight, IconPin, IconTrash, IconRename, IconCopy } from './icons'
 
 export default function CascadeColumn({
   dirPath,
@@ -17,6 +17,9 @@ export default function CascadeColumn({
   tagMap,
   tagDefs = [],
   onDelete,
+  onRename,
+  onCopy,
+  onMove,
 }) {
   const { entries, loading, error, refresh } = useDirectory(dirPath)
   const [showFilter, setShowFilter] = React.useState(false)
@@ -25,11 +28,23 @@ export default function CascadeColumn({
   const [newName, setNewName] = React.useState('')
   const [showNewMenu, setShowNewMenu] = React.useState(false)
   const [hoveredItem, setHoveredItem] = React.useState(null)
+  const [renamingPath, setRenamingPath] = React.useState(null)
+  const [renameValue, setRenameValue] = React.useState('')
+  const [dragOverPath, setDragOverPath] = React.useState(null)
+  const [isDragOver, setIsDragOver] = React.useState(false)
   const newInputRef = React.useRef(null)
+  const renameInputRef = React.useRef(null)
 
   React.useEffect(() => {
     if (creating && newInputRef.current) newInputRef.current.focus()
   }, [creating])
+
+  React.useEffect(() => {
+    if (renamingPath && renameInputRef.current) {
+      renameInputRef.current.focus()
+      renameInputRef.current.select()
+    }
+  }, [renamingPath])
 
   const startCreating = (type) => {
     setShowNewMenu(false)
@@ -51,6 +66,22 @@ export default function CascadeColumn({
   }
 
   const cancelCreate = () => { setCreating(null); setNewName('') }
+
+  const startRename = (item, e) => {
+    e.stopPropagation()
+    setRenamingPath(item.path)
+    setRenameValue(item.name)
+  }
+
+  const confirmRename = () => {
+    const name = renameValue.trim()
+    if (name && name !== entries.find(e => e.path === renamingPath)?.name) {
+      onRename?.(entries.find(e => e.path === renamingPath), name)
+    }
+    setRenamingPath(null)
+  }
+
+  const cancelRename = () => setRenamingPath(null)
 
   const filtered = React.useMemo(() => {
     return entries
@@ -137,7 +168,32 @@ export default function CascadeColumn({
       )}
 
       {/* Items list */}
-      <div style={{ flex: 1, overflow: 'auto', padding: 4 }} onClick={() => setShowNewMenu(false)}>
+      <div
+        style={{
+          flex: 1, overflow: 'auto', padding: 4,
+          background: isDragOver ? 'rgba(111,76,179,0.04)' : undefined,
+          transition: 'background 0.1s',
+        }}
+        onClick={() => setShowNewMenu(false)}
+        onDragOver={(e) => {
+          if (e.dataTransfer.types.includes('text/cascade-path')) {
+            e.preventDefault()
+            e.dataTransfer.dropEffect = 'move'
+            setIsDragOver(true)
+          }
+        }}
+        onDragLeave={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget)) setIsDragOver(false)
+        }}
+        onDrop={(e) => {
+          const srcPath = e.dataTransfer.getData('text/cascade-path')
+          setIsDragOver(false)
+          if (srcPath && onMove) {
+            e.preventDefault()
+            onMove(srcPath, dirPath)
+          }
+        }}>
+
         {/* Inline creation row */}
         {creating && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 6px', marginBottom: 2 }}>
@@ -167,6 +223,9 @@ export default function CascadeColumn({
           const isMulti = multiSel.includes(item.path) && multiSel.length > 1
           const itemTags = tagMap?.[item.path] || item.tags || []
           const hasTags = itemTags.length > 0
+          const isHovered = hoveredItem === item.path
+          const isRenaming = renamingPath === item.path
+          const isDragTarget = dragOverPath === item.path && item.isDirectory
 
           return (
             <div
@@ -175,49 +234,116 @@ export default function CascadeColumn({
               onMouseEnter={() => setHoveredItem(item.path)}
               onMouseLeave={() => setHoveredItem(null)}>
             <button
-              onClick={(e) => onSelect(item, e)}
+              onClick={(e) => !isRenaming && onSelect(item, e)}
               onContextMenu={(e) => onContextMenu(e, item)}
-              draggable
+              draggable={!isRenaming}
+              onDragStart={(e) => {
+                e.dataTransfer.setData('text/cascade-path', item.path)
+                e.dataTransfer.effectAllowed = 'move'
+              }}
+              onDragOver={(e) => {
+                if (item.isDirectory && e.dataTransfer.types.includes('text/cascade-path')) {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  e.dataTransfer.dropEffect = 'move'
+                  setDragOverPath(item.path)
+                  setIsDragOver(false)
+                }
+              }}
+              onDragLeave={() => setDragOverPath(null)}
+              onDrop={(e) => {
+                if (item.isDirectory) {
+                  const srcPath = e.dataTransfer.getData('text/cascade-path')
+                  setDragOverPath(null)
+                  if (srcPath && srcPath !== item.path && onMove) {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    onMove(srcPath, item.path)
+                  }
+                }
+              }}
               style={{
                 width: '100%', display: 'flex', alignItems: 'center', gap: 9,
-                padding: '6px 10px', paddingRight: hoveredItem === item.path ? 28 : 10,
+                padding: '6px 10px', paddingRight: isHovered ? 72 : 10,
                 borderRadius: 5, border: 'none',
-                background: isSel ? (isMulti ? accent.soft : accent.c) : (hoveredItem === item.path ? 'rgba(0,0,0,0.04)' : 'transparent'),
+                background: isDragTarget
+                  ? accent.soft
+                  : isSel ? (isMulti ? accent.soft : accent.c) : (isHovered ? 'rgba(0,0,0,0.04)' : 'transparent'),
                 color: isSel && !isMulti ? '#fff' : '#222',
                 cursor: 'pointer', fontSize: 12, textAlign: 'left', flex: 1,
+                outline: isDragTarget ? `2px solid ${accent.c}` : 'none',
               }}>
               <FileTile kind={item.kind} name={item.name} size={18} />
-              <span style={{
-                flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                fontWeight: isSel ? 500 : 400,
-              }}>
-                {item.name}
-              </span>
-              {hasTags && itemTags.map(t => {
+              {isRenaming ? (
+                <input
+                  ref={renameInputRef}
+                  value={renameValue}
+                  onChange={e => setRenameValue(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') { e.preventDefault(); confirmRename() }
+                    if (e.key === 'Escape') { e.preventDefault(); cancelRename() }
+                  }}
+                  onBlur={confirmRename}
+                  onClick={e => e.stopPropagation()}
+                  style={{
+                    flex: 1, height: 22, padding: '0 6px',
+                    border: `1px solid ${accent.c}`, borderRadius: 4,
+                    fontSize: 12, outline: 'none', background: '#fff', color: '#222',
+                  }}
+                />
+              ) : (
+                <span style={{
+                  flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  fontWeight: isSel ? 500 : 400,
+                }}>
+                  {item.name}
+                </span>
+              )}
+              {!isRenaming && hasTags && itemTags.map(t => {
                 const tag = tagDefs.find(x => x.id === t)
                 return tag && (
                   <div key={t} style={{ width: 6, height: 6, borderRadius: 99, background: `oklch(0.62 0.16 ${tag.hue})`, flex: 'none' }} />
                 )
               })}
-              {item.isDirectory && (
+              {!isRenaming && item.isDirectory && (
                 <IconChevronRight size={11} color={isSel && !isMulti ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.35)'} />
               )}
             </button>
-            {hoveredItem === item.path && onDelete && (
-              <button
-                onClick={(e) => { e.stopPropagation(); onDelete(item) }}
-                title="Move to Trash"
-                style={{
-                  position: 'absolute', right: 6,
-                  width: 20, height: 20, border: 'none', borderRadius: 4,
-                  background: 'transparent', cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: '#999',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(220,50,50,0.1)'; e.currentTarget.style.color = '#e53e3e' }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#999' }}>
-                <IconTrash size={12} />
-              </button>
+
+            {/* Hover action buttons */}
+            {isHovered && !isRenaming && (
+              <>
+                {onRename && (
+                  <HoverBtn
+                    right={52}
+                    title="Rename"
+                    onClick={(e) => startRename(item, e)}
+                    hoverColor="rgba(111,76,179,0.12)"
+                    hoverIconColor="#6f4cb3">
+                    <IconRename size={11} />
+                  </HoverBtn>
+                )}
+                {onCopy && (
+                  <HoverBtn
+                    right={30}
+                    title="Duplicate"
+                    onClick={(e) => { e.stopPropagation(); onCopy(item) }}
+                    hoverColor="rgba(0,131,143,0.1)"
+                    hoverIconColor="#00838f">
+                    <IconCopy size={11} />
+                  </HoverBtn>
+                )}
+                {onDelete && (
+                  <HoverBtn
+                    right={6}
+                    title="Move to Trash"
+                    onClick={(e) => { e.stopPropagation(); onDelete(item) }}
+                    hoverColor="rgba(220,50,50,0.1)"
+                    hoverIconColor="#e53e3e">
+                    <IconTrash size={12} />
+                  </HoverBtn>
+                )}
+              </>
             )}
             </div>
           )
@@ -238,6 +364,28 @@ function HeaderBtn({ children, onClick, active, title }) {
         borderRadius: 3,
         color: active ? '#6f4cb3' : '#888',
         cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+      {children}
+    </button>
+  )
+}
+
+function HoverBtn({ children, right, title, onClick, hoverColor, hoverIconColor }) {
+  const [hov, setHov] = React.useState(false)
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        position: 'absolute', right,
+        width: 20, height: 20, border: 'none', borderRadius: 4,
+        background: hov ? hoverColor : 'transparent',
+        cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: hov ? hoverIconColor : '#999',
+        transition: 'background 0.1s, color 0.1s',
       }}>
       {children}
     </button>

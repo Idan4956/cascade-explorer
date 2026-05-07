@@ -246,6 +246,52 @@ export default function CascadeExplorer({ homedir, accent = 'purple' }) {
     }
   }, [])
 
+  const renameItem = React.useCallback(async (item, newName) => {
+    const api = window.electronAPI
+    if (!api) return
+    const sep = item.path.includes('\\') ? '\\' : '/'
+    const dir = item.path.substring(0, item.path.lastIndexOf(sep))
+    const newPath = dir + sep + newName
+    const result = await api.rename(item.path, newPath)
+    if (!result?.error) {
+      clearDirCache(dir)
+      setCascade(prev => prev.map(p => p === item.path ? newPath : p))
+      setRefreshKey(k => k + 1)
+    }
+  }, [])
+
+  const copyItem = React.useCallback(async (item) => {
+    const api = window.electronAPI
+    if (!api) return
+    const sep = item.path.includes('\\') ? '\\' : '/'
+    const dir = item.path.substring(0, item.path.lastIndexOf(sep))
+    const dotIdx = item.name.lastIndexOf('.')
+    const hasExt = !item.isDirectory && dotIdx > 0
+    const base = hasExt ? item.name.slice(0, dotIdx) : item.name
+    const ext = hasExt ? item.name.slice(dotIdx) : ''
+    const destPath = dir + sep + base + ' copy' + ext
+    await api.copy(item.path, destPath)
+    clearDirCache(dir)
+    setRefreshKey(k => k + 1)
+  }, [])
+
+  const moveItem = React.useCallback(async (srcPath, destDirPath) => {
+    const api = window.electronAPI
+    if (!api) return
+    const sep = srcPath.includes('\\') ? '\\' : '/'
+    const name = srcPath.substring(srcPath.lastIndexOf(sep) + 1)
+    const srcDir = srcPath.substring(0, srcPath.lastIndexOf(sep))
+    if (srcDir === destDirPath) return
+    const destPath = destDirPath + sep + name
+    const result = await api.rename(srcPath, destPath)
+    if (!result?.error) {
+      clearDirCache(srcDir)
+      clearDirCache(destDirPath)
+      setCascade(prev => prev.map(p => p === srcPath ? destPath : p))
+      setRefreshKey(k => k + 1)
+    }
+  }, [])
+
   const deleteItems = React.useCallback(async (targets) => {
     const api = window.electronAPI
     if (!api || !targets.length) return
@@ -340,6 +386,9 @@ export default function CascadeExplorer({ homedir, accent = 'purple' }) {
               tagDefs={tagDefs}
               activeTagFilter={activeTagFilter}
               onDelete={(item) => deleteItems([item])}
+              onRename={renameItem}
+              onCopy={copyItem}
+              onMove={moveItem}
             />
           ))}
 
@@ -411,7 +460,7 @@ export default function CascadeExplorer({ homedir, accent = 'purple' }) {
 }
 
 // ── ColumnWithLoader — bridges useDirectory into CascadeColumn ──────────────
-function ColumnWithLoader({ dirPath, onEntries, quickFilters, showHidden, tagMap, tagDefs, activeTagFilter, ...colProps }) {
+function ColumnWithLoader({ dirPath, onEntries, quickFilters, showHidden, tagMap, tagDefs, activeTagFilter, onRename, onCopy, onMove, ...colProps }) {
   const { entries } = useDirectory(dirPath)
 
   React.useEffect(() => {
@@ -445,7 +494,7 @@ function ColumnWithLoader({ dirPath, onEntries, quickFilters, showHidden, tagMap
     }
   }, [quickFilters, showHidden, activeTagFilter, tagMap])
 
-  return <CascadeColumn {...colProps} dirPath={dirPath} extraFilter={extraFilter} tagMap={tagMap} tagDefs={tagDefs} />
+  return <CascadeColumn {...colProps} dirPath={dirPath} extraFilter={extraFilter} tagMap={tagMap} tagDefs={tagDefs} onRename={onRename} onCopy={onCopy} onMove={onMove} />
 }
 
 // ── StackPreviewLoader — loads parent dir, passes siblings to StackPreview ──

@@ -7,6 +7,7 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
+    "prepackage": "node scripts/generate-icon.mjs",
     "package": "electron-vite build && electron-builder --publish=never"
   },
   "dependencies": {
@@ -24,6 +25,7 @@
     "appId": "com.cascade.fileexplorer",
     "productName": "Cascade",
     "publish": null,
+    "icon": "resources/icon.png",
     "directories": {
       "output": "release"
     },
@@ -31,15 +33,18 @@
       "out/**"
     ],
     "win": {
-      "target": "zip"
+      "target": "zip",
+      "icon": "resources/icon.png"
     },
     "mac": {
       "target": "zip",
-      "category": "public.app-category.utilities"
+      "category": "public.app-category.utilities",
+      "icon": "resources/icon.png"
     },
     "linux": {
       "target": "tar.gz",
-      "category": "Utility"
+      "category": "Utility",
+      "icon": "resources/icon.png"
     }
   }
 }

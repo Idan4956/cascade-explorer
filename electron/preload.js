@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   trash: (filePath) => ipcRenderer.invoke('fs:trash', filePath),
   mkdir: (dirPath) => ipcRenderer.invoke('fs:mkdir', dirPath),
   createFile: (filePath) => ipcRenderer.invoke('fs:createFile', filePath),
+  copy: (srcPath, destPath) => ipcRenderer.invoke('fs:copy', srcPath, destPath),
   openExternal: (filePath) => ipcRenderer.invoke('fs:openExternal', filePath),
   showInFolder: (filePath) => ipcRenderer.invoke('fs:showInFolder', filePath),
   openDialog: (opts) => ipcRenderer.invoke('fs:openDialog', opts),

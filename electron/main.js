@@ -185,6 +185,28 @@ ipcMain.handle('fs:createFile', async (_, filePath) => {
   }
 })
 
+ipcMain.handle('fs:copy', async (_, srcPath, destPath) => {
+  try {
+    await copyRecursive(srcPath, destPath)
+    return { ok: true }
+  } catch (err) {
+    return { error: err.message }
+  }
+})
+
+async function copyRecursive(src, dest) {
+  const stat = await fs.promises.stat(src)
+  if (stat.isDirectory()) {
+    await fs.promises.mkdir(dest, { recursive: true })
+    const entries = await fs.promises.readdir(src)
+    for (const entry of entries) {
+      await copyRecursive(path.join(src, entry), path.join(dest, entry))
+    }
+  } else {
+    await fs.promises.copyFile(src, dest)
+  }
+}
+
 ipcMain.handle('fs:openExternal', async (_, filePath) => {
   try {
     await shell.openPath(filePath)
