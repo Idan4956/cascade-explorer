@@ -1,10 +1,12 @@
 import React from 'react'
-import { useDirectory } from '../hooks/useDirectory'
 import { FileTile, IconSearch, IconPlus, IconCommand, IconEye } from './icons'
+import { useTheme } from '../contexts/ThemeContext'
 
 export default function CommandPalette({ onClose, cascade, setCascade, setShowShortcuts, setStackMode, accent, loadedDirs, showHidden, onToggleShowHidden }) {
+  const { T } = useTheme()
   const [q, setQ] = React.useState('')
   const inputRef = React.useRef(null)
+  const [kbIdx, setKbIdx] = React.useState(0)
 
   React.useEffect(() => {
     inputRef.current?.focus()
@@ -27,7 +29,6 @@ export default function CommandPalette({ onClose, cascade, setCascade, setShowSh
   const [fsResults, setFsResults] = React.useState([])
   const [searching, setSearching] = React.useState(false)
 
-  // Cached results from already-visited folders (instant)
   const cachedFiles = React.useMemo(() => {
     const result = []
     for (const [dir, entries] of Object.entries(loadedDirs)) {
@@ -36,7 +37,6 @@ export default function CommandPalette({ onClose, cascade, setCascade, setShowSh
     return result
   }, [loadedDirs])
 
-  // Live filesystem search for queries 2+ chars
   React.useEffect(() => {
     if (ql.length < 2) { setFsResults([]); return }
     const api = window.electronAPI
@@ -51,7 +51,6 @@ export default function CommandPalette({ onClose, cascade, setCascade, setShowSh
     return () => { cancelled = true }
   }, [ql, cascade])
 
-  // Merge: filesystem results first, then fill from cache, dedupe by path
   const matched = React.useMemo(() => {
     if (!ql) return cachedFiles.filter(e => e.kind !== 'folder').slice(0, 8)
     const seen = new Set()
@@ -72,70 +71,74 @@ export default function CommandPalette({ onClose, cascade, setCascade, setShowSh
 
   const cmdMatched = ql ? commands.filter(c => c.name.toLowerCase().includes(ql)) : []
 
+  const allRows = [...cmdMatched.map(c => ({ type: 'cmd', ...c })), ...matched.map(e => ({ type: 'file', ...e }))]
+
   const jumpTo = (entry) => {
     const newCascade = [...cascade.slice(0, 1), entry.parentDir, entry.path].filter((v, i, a) => a.indexOf(v) === i)
     setCascade(newCascade)
     onClose()
   }
 
+  const handleKeyDown = (e) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); setKbIdx(i => Math.min(i + 1, allRows.length - 1)) }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setKbIdx(i => Math.max(i - 1, 0)) }
+    else if (e.key === 'Enter') {
+      const row = allRows[kbIdx]
+      if (row?.type === 'cmd') row.run()
+      else if (row?.type === 'file') jumpTo(row)
+    }
+  }
+
+  React.useEffect(() => setKbIdx(0), [q])
+
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: 'absolute', inset: 0, background: 'rgba(20,15,30,0.18)',
-        backdropFilter: 'blur(2px)', zIndex: 100,
-        display: 'flex', justifyContent: 'center', paddingTop: 80,
+    <div onClick={onClose} style={{
+      position: 'absolute', inset: 0, background: 'rgba(20,15,30,0.25)',
+      backdropFilter: 'blur(3px)', zIndex: 100,
+      display: 'flex', justifyContent: 'center', paddingTop: 80,
+    }}>
+      <div onClick={(e) => e.stopPropagation()} onKeyDown={handleKeyDown} style={{
+        width: 540, height: 'fit-content', maxHeight: 'calc(100% - 100px)',
+        background: T.modalBg, backdropFilter: 'blur(28px) saturate(160%)',
+        border: `1px solid ${T.borderMid}`, borderRadius: 12,
+        boxShadow: '0 32px 80px rgba(0,0,0,0.3), 0 8px 16px rgba(0,0,0,0.1)',
+        overflow: 'hidden', display: 'flex', flexDirection: 'column',
       }}>
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: 540, height: 'fit-content', maxHeight: 'calc(100% - 100px)',
-          background: 'rgba(252,250,255,0.98)', backdropFilter: 'blur(28px) saturate(160%)',
-          border: '1px solid rgba(0,0,0,0.08)', borderRadius: 12,
-          boxShadow: '0 32px 80px rgba(0,0,0,0.25), 0 8px 16px rgba(0,0,0,0.1)',
-          overflow: 'hidden', display: 'flex', flexDirection: 'column',
-        }}>
-        {/* Search input */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 18px', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
-          <IconSearch size={16} color="#888" />
-          <input
-            ref={inputRef}
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 18px', borderBottom: `1px solid ${T.border}` }}>
+          <IconSearch size={16} color={T.textDim} />
+          <input ref={inputRef} value={q} onChange={(e) => setQ(e.target.value)}
             placeholder="Search files, run commands…"
-            style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 15, color: '#1a1a1a' }}
-          />
-          <kbd style={{ fontSize: 10, padding: '3px 7px', background: 'rgba(0,0,0,0.06)', borderRadius: 4, color: '#666' }}>ESC</kbd>
+            style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontSize: 15, color: T.text }} />
+          <kbd style={{ fontSize: 10, padding: '3px 7px', background: T.hoverBg, borderRadius: 4, color: T.textSub }}>ESC</kbd>
         </div>
 
         <div style={{ overflow: 'auto', padding: 6, maxHeight: 420 }}>
           {cmdMatched.length > 0 && (
-            <PaletteSection title="Commands">
-              {cmdMatched.map(c => (
-                <PaletteRow key={c.id} icon={c.icon} title={c.name} accent={accent} onClick={c.run}>
-                  <kbd style={{ fontSize: 10, padding: '2px 6px', background: 'rgba(0,0,0,0.06)', borderRadius: 3, color: '#666' }}>{c.kbd}</kbd>
+            <PaletteSection title="Commands" T={T}>
+              {cmdMatched.map((c, i) => (
+                <PaletteRow key={c.id} icon={c.icon} title={c.name} accent={accent} T={T}
+                  isKb={allRows.indexOf(allRows.find(r => r.id === c.id)) === kbIdx}
+                  onClick={c.run}>
+                  {c.kbd && <kbd style={{ fontSize: 10, padding: '2px 6px', background: T.hoverBg, borderRadius: 3, color: T.textSub }}>{c.kbd}</kbd>}
                 </PaletteRow>
               ))}
             </PaletteSection>
           )}
 
           {matched.length > 0 && (
-            <PaletteSection title={ql ? (searching ? 'Files (searching…)' : 'Files') : 'Recent files'}>
-              {matched.map(entry => (
-                <PaletteRow
-                  key={entry.path}
+            <PaletteSection title={ql ? (searching ? 'Files (searching…)' : 'Files') : 'Recent files'} T={T}>
+              {matched.map((entry, fi) => (
+                <PaletteRow key={entry.path}
                   icon={<FileTile kind={entry.kind} name={entry.name} size={18} />}
-                  title={entry.name}
-                  subtitle={entry.parentDir}
-                  accent={accent}
-                  onClick={() => jumpTo(entry)}
-                />
+                  title={entry.name} subtitle={entry.parentDir} accent={accent} T={T}
+                  isKb={cmdMatched.length + fi === kbIdx}
+                  onClick={() => jumpTo(entry)} />
               ))}
             </PaletteSection>
           )}
 
           {ql && matched.length === 0 && cmdMatched.length === 0 && (
-            <div style={{ padding: 32, textAlign: 'center', color: '#888', fontSize: 13 }}>
+            <div style={{ padding: 32, textAlign: 'center', color: T.textDim, fontSize: 13 }}>
               No matches for "{q}"
             </div>
           )}
@@ -145,34 +148,28 @@ export default function CommandPalette({ onClose, cascade, setCascade, setShowSh
   )
 }
 
-function PaletteSection({ title, children }) {
+function PaletteSection({ title, children, T }) {
   return (
     <div style={{ padding: '6px 0' }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: '#888', letterSpacing: 0.5, padding: '6px 12px', textTransform: 'uppercase' }}>{title}</div>
+      <div style={{ fontSize: 10, fontWeight: 700, color: T.textDim, letterSpacing: 0.5, padding: '6px 12px', textTransform: 'uppercase' }}>{title}</div>
       {children}
     </div>
   )
 }
 
-function PaletteRow({ icon, title, subtitle, children, onClick, accent }) {
+function PaletteRow({ icon, title, subtitle, children, onClick, accent, T, isKb }) {
   const [hov, setHov] = React.useState(false)
   return (
-    <button
-      onClick={onClick}
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
-      style={{
-        width: '100%', display: 'flex', alignItems: 'center', gap: 12,
-        padding: '8px 12px', border: 'none',
-        background: hov ? accent.soft : 'transparent',
-        borderRadius: 6, cursor: 'pointer', textAlign: 'left',
-      }}>
+    <button onClick={onClick} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)} style={{
+      width: '100%', display: 'flex', alignItems: 'center', gap: 12,
+      padding: '8px 12px', border: 'none',
+      background: (hov || isKb) ? accent.soft : 'transparent',
+      borderRadius: 6, cursor: 'pointer', textAlign: 'left',
+    }}>
       {icon}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, color: '#1a1a1a', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</div>
-        {subtitle && (
-          <div style={{ fontSize: 11, color: '#888', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1 }}>{subtitle}</div>
-        )}
+        <div style={{ fontSize: 13, color: T.text, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</div>
+        {subtitle && <div style={{ fontSize: 11, color: T.textDim, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1 }}>{subtitle}</div>}
       </div>
       {children}
     </button>

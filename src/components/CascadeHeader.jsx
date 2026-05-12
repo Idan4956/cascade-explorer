@@ -1,20 +1,21 @@
 import React from 'react'
-import { IconBack, IconForward, IconSearch, IconClose, IconMinus, FileTile, IconClock } from './icons'
+import { IconBack, IconForward, IconSearch, IconClose, IconMinus, FileTile, IconClock, IconMoon, IconSun } from './icons'
+import { useTheme } from '../contexts/ThemeContext'
 
 export default function CascadeHeader({ cascade, nodeMap, setCascade, openPalette, history, canGoBack, canGoForward, onGoBack, onGoForward, stackMode, setStackMode, accent }) {
+  const { T, dark, toggleDark } = useTheme()
   const [dragOverIdx, setDragOverIdx] = React.useState(null)
 
   return (
     <div style={{
       padding: '8px 14px 0',
       display: 'flex', flexDirection: 'column', gap: 6,
-      background: 'rgba(252,250,255,0.85)', backdropFilter: 'blur(20px)',
-      borderBottom: '1px solid rgba(0,0,0,0.06)',
+      background: T.headerBg, backdropFilter: 'blur(20px)',
+      borderBottom: `1px solid ${T.border}`,
       WebkitAppRegion: 'drag',
       flexShrink: 0,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        {/* macOS traffic light spacer or custom window controls */}
         <WindowControls />
 
         <div style={{ display: 'flex', gap: 4, WebkitAppRegion: 'no-drag' }}>
@@ -40,8 +41,8 @@ export default function CascadeHeader({ cascade, nodeMap, setCascade, openPalett
                   style={{
                     height: 28, padding: '0 10px',
                     border: isDropTarget ? `1px dashed ${accent.c}` : 'none',
-                    background: isDropTarget ? accent.tint : (isLast ? accent.soft : 'rgba(0,0,0,0.04)'),
-                    color: isLast ? accent.c : '#444',
+                    background: isDropTarget ? accent.tint : (isLast ? accent.soft : T.hoverBg),
+                    color: isLast ? accent.c : T.textMid,
                     fontWeight: isLast ? 600 : 500,
                     borderRadius: 99, fontSize: 12, cursor: 'pointer',
                     display: 'flex', alignItems: 'center', gap: 6,
@@ -52,7 +53,7 @@ export default function CascadeHeader({ cascade, nodeMap, setCascade, openPalett
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
                 </button>
                 {!isLast && (
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="rgba(0,0,0,0.3)" strokeWidth="2" strokeLinecap="round" style={{ flex: 'none' }}>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke={T.textFaint} strokeWidth="2" strokeLinecap="round" style={{ flex: 'none' }}>
                     <path d="M9 5l7 7-7 7" />
                   </svg>
                 )}
@@ -68,8 +69,8 @@ export default function CascadeHeader({ cascade, nodeMap, setCascade, openPalett
           style={{
             height: 30, padding: '0 10px',
             background: stackMode ? accent.soft : 'transparent',
-            color: stackMode ? accent.c : '#444',
-            border: '1px solid rgba(0,0,0,0.08)', borderRadius: 6,
+            color: stackMode ? accent.c : T.textMid,
+            border: `1px solid ${T.borderMid}`, borderRadius: 6,
             fontSize: 11.5, fontWeight: 500, cursor: 'pointer',
             display: 'flex', alignItems: 'center', gap: 6,
             WebkitAppRegion: 'no-drag', flexShrink: 0,
@@ -87,34 +88,50 @@ export default function CascadeHeader({ cascade, nodeMap, setCascade, openPalett
           onClick={openPalette}
           style={{
             height: 30, padding: '0 12px',
-            background: '#fff', border: '1px solid rgba(0,0,0,0.08)',
+            background: T.inputBg, border: `1px solid ${T.borderMid}`,
             borderRadius: 7, display: 'flex', alignItems: 'center', gap: 8,
-            cursor: 'pointer', fontSize: 12, color: '#666', minWidth: 200,
+            cursor: 'pointer', fontSize: 12, color: T.textSub, minWidth: 200,
             WebkitAppRegion: 'no-drag', flexShrink: 0,
           }}>
-          <IconSearch size={12} />
+          <IconSearch size={12} color={T.textSub} />
           <span style={{ flex: 1, textAlign: 'left' }}>Search files, run commands…</span>
-          <kbd style={{ fontSize: 10, padding: '2px 6px', background: 'rgba(0,0,0,0.05)', borderRadius: 3, color: '#666' }}>⌘K</kbd>
+          <kbd style={{ fontSize: 10, padding: '2px 6px', background: T.hoverBg, borderRadius: 3, color: T.textDim }}>⌘K</kbd>
+        </button>
+
+        {/* Dark mode toggle */}
+        <button
+          onClick={toggleDark}
+          title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+          style={{
+            width: 30, height: 30, border: 'none',
+            background: 'transparent', borderRadius: 6,
+            color: T.textDim, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            WebkitAppRegion: 'no-drag', flexShrink: 0,
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = T.hoverBg; e.currentTarget.style.color = T.text }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = T.textDim }}>
+          {dark ? <IconSun size={14} /> : <IconMoon size={14} />}
         </button>
       </div>
 
       {/* History trail */}
       {history.length > 1 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingBottom: 6, fontSize: 10.5, color: '#888', WebkitAppRegion: 'no-drag', overflow: 'hidden' }}>
-          <IconClock size={11} color="#888" />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingBottom: 6, fontSize: 10.5, color: T.textDim, WebkitAppRegion: 'no-drag', overflow: 'hidden' }}>
+          <IconClock size={11} color={T.textDim} />
           <span style={{ flexShrink: 0 }}>Trail:</span>
           {history.slice(-8).map((p, i) => {
             const label = p[p.length - 1].split('/').pop() || p[p.length - 1].split('\\').pop() || p[p.length - 1]
             return (
               <button key={i} onClick={() => setCascade(p)} style={{
                 height: 18, padding: '0 7px', borderRadius: 99,
-                border: '1px solid rgba(0,0,0,0.08)', background: 'transparent',
-                color: '#666', fontSize: 10.5, cursor: 'pointer',
+                border: `1px solid ${T.borderMid}`, background: 'transparent',
+                color: T.textSub, fontSize: 10.5, cursor: 'pointer',
                 display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', flexShrink: 0,
               }}
                 onMouseEnter={(e) => { e.currentTarget.style.background = accent.tint; e.currentTarget.style.color = accent.c }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#666' }}>
-                <div style={{ width: 4, height: 4, borderRadius: 99, background: '#aaa' }} />
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = T.textSub }}>
+                <div style={{ width: 4, height: 4, borderRadius: 99, background: T.textFaint }} />
                 {label}
               </button>
             )
@@ -126,6 +143,7 @@ export default function CascadeHeader({ cascade, nodeMap, setCascade, openPalett
 }
 
 function NavBtn({ children, onClick, disabled }) {
+  const { T } = useTheme()
   const [hov, setHov] = React.useState(false)
   return (
     <button
@@ -135,8 +153,8 @@ function NavBtn({ children, onClick, disabled }) {
       onMouseLeave={() => setHov(false)}
       style={{
         width: 30, height: 30, border: 'none',
-        background: hov && !disabled ? 'rgba(0,0,0,0.06)' : 'transparent',
-        borderRadius: 6, color: disabled ? '#ccc' : '#444',
+        background: hov && !disabled ? T.hoverBg : 'transparent',
+        borderRadius: 6, color: disabled ? T.textFaint : T.textMid,
         cursor: disabled ? 'default' : 'pointer',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>

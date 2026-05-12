@@ -1,6 +1,7 @@
 import React from 'react'
 import { useDirectory } from '../hooks/useDirectory'
 import { FileTile, IconFilter, IconChevronUp, IconChevronDown, IconChevronRight, IconPin, IconTrash, IconRename, IconCopy } from './icons'
+import { useTheme } from '../contexts/ThemeContext'
 
 export default function CascadeColumn({
   dirPath,
@@ -20,11 +21,14 @@ export default function CascadeColumn({
   onRename,
   onCopy,
   onMove,
+  cutPaths,
 }) {
+  const { T } = useTheme()
   const { entries, loading, error, refresh } = useDirectory(dirPath)
   const [showFilter, setShowFilter] = React.useState(false)
+  const [sortField, setSortField] = React.useState('name') // 'name' | 'modified' | 'size'
   const [sortDir, setSortDir] = React.useState('asc')
-  const [creating, setCreating] = React.useState(null) // 'file' | 'folder'
+  const [creating, setCreating] = React.useState(null)
   const [newName, setNewName] = React.useState('')
   const [showNewMenu, setShowNewMenu] = React.useState(false)
   const [hoveredItem, setHoveredItem] = React.useState(null)
@@ -32,13 +36,11 @@ export default function CascadeColumn({
   const [renameValue, setRenameValue] = React.useState('')
   const [dragOverPath, setDragOverPath] = React.useState(null)
   const [isDragOver, setIsDragOver] = React.useState(false)
+  const [kbIdx, setKbIdx] = React.useState(-1)
   const newInputRef = React.useRef(null)
   const renameInputRef = React.useRef(null)
 
-  React.useEffect(() => {
-    if (creating && newInputRef.current) newInputRef.current.focus()
-  }, [creating])
-
+  React.useEffect(() => { if (creating && newInputRef.current) newInputRef.current.focus() }, [creating])
   React.useEffect(() => {
     if (renamingPath && renameInputRef.current) {
       renameInputRef.current.focus()
@@ -75,13 +77,15 @@ export default function CascadeColumn({
 
   const confirmRename = () => {
     const name = renameValue.trim()
-    if (name && name !== entries.find(e => e.path === renamingPath)?.name) {
-      onRename?.(entries.find(e => e.path === renamingPath), name)
-    }
+    const orig = entries.find(e => e.path === renamingPath)
+    if (name && orig && name !== orig.name) onRename?.(orig, name)
     setRenamingPath(null)
   }
 
   const cancelRename = () => setRenamingPath(null)
+
+  const sortFieldLabel = { name: 'A–Z', modified: 'Date', size: 'Size' }
+  const nextSortField = { name: 'modified', modified: 'size', size: 'name' }
 
   const filtered = React.useMemo(() => {
     return entries
@@ -89,49 +93,84 @@ export default function CascadeColumn({
       .filter(e => !extraFilter || extraFilter(e))
       .sort((a, b) => {
         if (a.isDirectory !== b.isDirectory) return a.isDirectory ? -1 : 1
-        const cmp = a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+        let cmp = 0
+        if (sortField === 'name') cmp = a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+        else if (sortField === 'modified') cmp = (a.modifiedRaw || '') < (b.modifiedRaw || '') ? -1 : 1
+        else if (sortField === 'size') cmp = (a.sizeBytes || 0) - (b.sizeBytes || 0)
         return sortDir === 'asc' ? cmp : -cmp
       })
-  }, [entries, filterText, sortDir, extraFilter])
+  }, [entries, filterText, sortDir, sortField, extraFilter])
+
+  const handleKeyDown = (e) => {
+    if (filtered.length === 0 || renamingPath || creating) return
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setKbIdx(i => Math.min(i < 0 ? 0 : i + 1, filtered.length - 1))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setKbIdx(i => Math.max(i < 0 ? filtered.length - 1 : i - 1, 0))
+    } else if (e.key === 'Enter' || e.key === 'ArrowRight') {
+      e.preventDefault()
+      const idx = kbIdx >= 0 ? kbIdx : 0
+      if (filtered[idx]) onSelect(filtered[idx], {})
+    } else if (e.key === 'Escape') {
+      setKbIdx(-1)
+    }
+  }
+
+  const inputStyle = {
+    flex: 1, height: 24, padding: '0 8px',
+    border: `1px solid ${T.inputBorder}`, borderRadius: 4,
+    fontSize: 11.5, outline: 'none',
+    background: T.inputBg, color: T.text,
+  }
+
+  const pinnedBg = T.dark
+    ? `linear-gradient(180deg, ${accent.tint}, ${T.columnBg})`
+    : `linear-gradient(180deg, ${accent.tint}, rgba(255,255,255,0.55))`
 
   return (
-    <div style={{
-      width: 240, minWidth: 240, maxWidth: 240,
-      borderRight: '1px solid rgba(0,0,0,0.06)',
-      background: isPinned
-        ? `linear-gradient(180deg, ${accent.tint}, rgba(255,255,255,0.55))`
-        : 'rgba(255,255,255,0.55)',
-      display: 'flex', flexDirection: 'column', minHeight: 0,
-      scrollSnapAlign: 'start', flexShrink: 0,
-    }}>
+    <div
+      tabIndex={0}
+      onKeyDown={handleKeyDown}
+      onBlur={() => setKbIdx(-1)}
+      style={{
+        width: 240, minWidth: 240, maxWidth: 240,
+        borderRight: `1px solid ${T.border}`,
+        background: isPinned ? pinnedBg : T.columnBg,
+        display: 'flex', flexDirection: 'column', minHeight: 0,
+        scrollSnapAlign: 'start', flexShrink: 0,
+        outline: 'none',
+      }}>
+
       {/* Column header */}
       <div style={{
         padding: '0 8px 0 12px', height: 28,
         display: 'flex', alignItems: 'center', gap: 4,
-        fontSize: 10.5, color: '#888', borderBottom: '1px solid rgba(0,0,0,0.05)',
+        fontSize: 10.5, color: T.textDim, borderBottom: `1px solid ${T.border}`,
         fontWeight: 600, letterSpacing: 0.4, textTransform: 'uppercase', flexShrink: 0,
       }}>
         <span style={{ flex: 1 }}>
           {loading ? '…' : error ? '!' : `${filtered.length} of ${entries.length}`}
         </span>
         <div style={{ position: 'relative' }}>
-          <HeaderBtn onClick={() => setShowNewMenu(v => !v)} title="New file or folder" active={showNewMenu}>
+          <HeaderBtn onClick={() => setShowNewMenu(v => !v)} title="New file or folder" active={showNewMenu} T={T}>
             <span style={{ fontSize: 13, lineHeight: 1 }}>+</span>
           </HeaderBtn>
           {showNewMenu && (
             <div style={{
               position: 'absolute', top: 22, right: 0, zIndex: 100,
-              background: '#fff', border: '1px solid rgba(0,0,0,0.1)',
-              borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+              background: T.modalBg, border: `1px solid ${T.borderMid}`,
+              borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
               overflow: 'hidden', minWidth: 130,
             }}>
               {[['folder','📁','New Folder'],['file','📄','New File']].map(([type, icon, label]) => (
                 <button key={type} onClick={() => startCreating(type)} style={{
                   width: '100%', padding: '8px 12px', border: 'none',
                   background: 'transparent', textAlign: 'left',
-                  fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, color: '#222',
+                  fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, color: T.text,
                 }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.05)'}
+                  onMouseEnter={e => e.currentTarget.style.background = T.hoverBg}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                   <span>{icon}</span>{label}
                 </button>
@@ -139,31 +178,26 @@ export default function CascadeColumn({
             </div>
           )}
         </div>
-        <HeaderBtn active={showFilter} onClick={() => setShowFilter(v => !v)} title="Filter column">
+        <HeaderBtn active={showFilter} onClick={() => setShowFilter(v => !v)} title="Filter column" T={T}>
           <IconFilter size={10} />
         </HeaderBtn>
-        <HeaderBtn onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')} title="Sort">
+        {/* Sort field cycle */}
+        <HeaderBtn onClick={() => setSortField(f => nextSortField[f])} title={`Sort by: ${sortFieldLabel[sortField]}`} T={T}>
+          <span style={{ fontSize: 8.5, fontWeight: 700, letterSpacing: 0 }}>{sortFieldLabel[sortField]}</span>
+        </HeaderBtn>
+        <HeaderBtn onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')} title={sortDir === 'asc' ? 'Ascending' : 'Descending'} T={T}>
           {sortDir === 'asc' ? <IconChevronUp size={10} /> : <IconChevronDown size={10} />}
         </HeaderBtn>
-        <HeaderBtn active={isPinned} onClick={onTogglePin} title={isPinned ? 'Unpin column' : 'Pin column'}>
+        <HeaderBtn active={isPinned} onClick={onTogglePin} title={isPinned ? 'Unpin column' : 'Pin column'} T={T}>
           <IconPin size={10} />
         </HeaderBtn>
       </div>
 
       {/* Column filter input */}
       {showFilter && (
-        <div style={{ padding: '6px 8px', borderBottom: '1px solid rgba(0,0,0,0.05)', flexShrink: 0 }}>
-          <input
-            value={filterText}
-            onChange={(e) => setFilter(e.target.value)}
-            placeholder="Filter…"
-            autoFocus
-            style={{
-              width: '100%', height: 24, padding: '0 8px',
-              border: '1px solid rgba(0,0,0,0.1)', borderRadius: 4,
-              fontSize: 11.5, outline: 'none', background: '#fff',
-            }}
-          />
+        <div style={{ padding: '6px 8px', borderBottom: `1px solid ${T.border}`, flexShrink: 0 }}>
+          <input value={filterText} onChange={(e) => setFilter(e.target.value)} placeholder="Filter…" autoFocus
+            style={{ width: '100%', height: 24, padding: '0 8px', border: `1px solid ${T.inputBorder}`, borderRadius: 4, fontSize: 11.5, outline: 'none', background: T.inputBg, color: T.text }} />
         </div>
       )}
 
@@ -171,45 +205,30 @@ export default function CascadeColumn({
       <div
         style={{
           flex: 1, overflow: 'auto', padding: 4,
-          background: isDragOver ? 'rgba(111,76,179,0.04)' : undefined,
+          background: isDragOver ? (T.dark ? 'rgba(111,76,179,0.08)' : 'rgba(111,76,179,0.04)') : undefined,
           transition: 'background 0.1s',
         }}
         onClick={() => setShowNewMenu(false)}
         onDragOver={(e) => {
           if (e.dataTransfer.types.includes('text/cascade-path')) {
-            e.preventDefault()
-            e.dataTransfer.dropEffect = 'move'
-            setIsDragOver(true)
+            e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setIsDragOver(true)
           }
         }}
-        onDragLeave={(e) => {
-          if (!e.currentTarget.contains(e.relatedTarget)) setIsDragOver(false)
-        }}
+        onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setIsDragOver(false) }}
         onDrop={(e) => {
           const srcPath = e.dataTransfer.getData('text/cascade-path')
           setIsDragOver(false)
-          if (srcPath && onMove) {
-            e.preventDefault()
-            onMove(srcPath, dirPath)
-          }
+          if (srcPath && onMove) { e.preventDefault(); onMove(srcPath, dirPath) }
         }}>
 
         {/* Inline creation row */}
         {creating && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 6px', marginBottom: 2 }}>
             <FileTile kind={creating === 'folder' ? 'folder' : 'file'} size={18} />
-            <input
-              ref={newInputRef}
-              value={newName}
-              onChange={e => setNewName(e.target.value)}
+            <input ref={newInputRef} value={newName} onChange={e => setNewName(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') confirmCreate(); if (e.key === 'Escape') cancelCreate() }}
               onBlur={confirmCreate}
-              style={{
-                flex: 1, height: 24, padding: '0 7px',
-                border: '1px solid rgba(111,76,179,0.5)', borderRadius: 4,
-                fontSize: 12, outline: 'none', background: '#fff',
-              }}
-            />
+              style={{ ...inputStyle, border: `1px solid ${accent.c}55` }} />
           </div>
         )}
 
@@ -218,7 +237,8 @@ export default function CascadeColumn({
             {error.includes('EACCES') ? 'Permission denied' : error.includes('ENOENT') ? 'Folder not found' : 'Cannot read folder'}
           </div>
         )}
-        {!error && filtered.map(item => {
+
+        {!error && filtered.map((item, idx) => {
           const isSel = selectedPath === item.path || multiSel.includes(item.path)
           const isMulti = multiSel.includes(item.path) && multiSel.length > 1
           const itemTags = tagMap?.[item.path] || item.tags || []
@@ -226,125 +246,75 @@ export default function CascadeColumn({
           const isHovered = hoveredItem === item.path
           const isRenaming = renamingPath === item.path
           const isDragTarget = dragOverPath === item.path && item.isDirectory
+          const isCut = cutPaths?.has(item.path)
+          const isKb = kbIdx === idx
+
+          const rowBg = isDragTarget
+            ? accent.soft
+            : isSel ? (isMulti ? accent.soft : accent.c) : (isKb ? T.hoverBg : (isHovered ? T.hoverBg : 'transparent'))
 
           return (
             <div
               key={item.path}
-              style={{ position: 'relative', display: 'flex', alignItems: 'center' }}
+              ref={isKb ? el => el?.scrollIntoView({ block: 'nearest' }) : null}
+              style={{ position: 'relative', display: 'flex', alignItems: 'center', opacity: isCut ? 0.4 : 1 }}
               onMouseEnter={() => setHoveredItem(item.path)}
               onMouseLeave={() => setHoveredItem(null)}>
-            <button
-              onClick={(e) => !isRenaming && onSelect(item, e)}
-              onContextMenu={(e) => onContextMenu(e, item)}
-              draggable={!isRenaming}
-              onDragStart={(e) => {
-                e.dataTransfer.setData('text/cascade-path', item.path)
-                e.dataTransfer.effectAllowed = 'move'
-              }}
-              onDragOver={(e) => {
-                if (item.isDirectory && e.dataTransfer.types.includes('text/cascade-path')) {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  e.dataTransfer.dropEffect = 'move'
-                  setDragOverPath(item.path)
-                  setIsDragOver(false)
-                }
-              }}
-              onDragLeave={() => setDragOverPath(null)}
-              onDrop={(e) => {
-                if (item.isDirectory) {
-                  const srcPath = e.dataTransfer.getData('text/cascade-path')
-                  setDragOverPath(null)
-                  if (srcPath && srcPath !== item.path && onMove) {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    onMove(srcPath, item.path)
+              <button
+                onClick={(e) => !isRenaming && onSelect(item, e)}
+                onContextMenu={(e) => onContextMenu(e, item)}
+                draggable={!isRenaming}
+                onDragStart={(e) => { e.dataTransfer.setData('text/cascade-path', item.path); e.dataTransfer.effectAllowed = 'move' }}
+                onDragOver={(e) => {
+                  if (item.isDirectory && e.dataTransfer.types.includes('text/cascade-path')) {
+                    e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'move'; setDragOverPath(item.path); setIsDragOver(false)
                   }
-                }
-              }}
-              style={{
-                width: '100%', display: 'flex', alignItems: 'center', gap: 9,
-                padding: '6px 10px', paddingRight: isHovered ? 72 : 10,
-                borderRadius: 5, border: 'none',
-                background: isDragTarget
-                  ? accent.soft
-                  : isSel ? (isMulti ? accent.soft : accent.c) : (isHovered ? 'rgba(0,0,0,0.04)' : 'transparent'),
-                color: isSel && !isMulti ? '#fff' : '#222',
-                cursor: 'pointer', fontSize: 12, textAlign: 'left', flex: 1,
-                outline: isDragTarget ? `2px solid ${accent.c}` : 'none',
-              }}>
-              <FileTile kind={item.kind} name={item.name} size={18} />
-              {isRenaming ? (
-                <input
-                  ref={renameInputRef}
-                  value={renameValue}
-                  onChange={e => setRenameValue(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') { e.preventDefault(); confirmRename() }
-                    if (e.key === 'Escape') { e.preventDefault(); cancelRename() }
-                  }}
-                  onBlur={confirmRename}
-                  onClick={e => e.stopPropagation()}
-                  style={{
-                    flex: 1, height: 22, padding: '0 6px',
-                    border: `1px solid ${accent.c}`, borderRadius: 4,
-                    fontSize: 12, outline: 'none', background: '#fff', color: '#222',
-                  }}
-                />
-              ) : (
-                <span style={{
-                  flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  fontWeight: isSel ? 500 : 400,
+                }}
+                onDragLeave={() => setDragOverPath(null)}
+                onDrop={(e) => {
+                  if (item.isDirectory) {
+                    const srcPath = e.dataTransfer.getData('text/cascade-path')
+                    setDragOverPath(null)
+                    if (srcPath && srcPath !== item.path && onMove) { e.preventDefault(); e.stopPropagation(); onMove(srcPath, item.path) }
+                  }
+                }}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: 9,
+                  padding: '6px 10px', paddingRight: isHovered ? 72 : 10,
+                  borderRadius: 5, border: 'none',
+                  background: rowBg,
+                  color: isSel && !isMulti ? '#fff' : T.text,
+                  cursor: 'pointer', fontSize: 12, textAlign: 'left', flex: 1,
+                  outline: (isDragTarget || isKb) ? `1px solid ${accent.c}44` : 'none',
                 }}>
-                  {item.name}
-                </span>
-              )}
-              {!isRenaming && hasTags && itemTags.map(t => {
-                const tag = tagDefs.find(x => x.id === t)
-                return tag && (
-                  <div key={t} style={{ width: 6, height: 6, borderRadius: 99, background: `oklch(0.62 0.16 ${tag.hue})`, flex: 'none' }} />
-                )
-              })}
-              {!isRenaming && item.isDirectory && (
-                <IconChevronRight size={11} color={isSel && !isMulti ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.35)'} />
-              )}
-            </button>
+                <FileTile kind={item.kind} name={item.name} size={18} />
+                {isRenaming ? (
+                  <input ref={renameInputRef} value={renameValue} onChange={e => setRenameValue(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); confirmRename() } if (e.key === 'Escape') { e.preventDefault(); cancelRename() } }}
+                    onBlur={confirmRename}
+                    onClick={e => e.stopPropagation()}
+                    style={{ flex: 1, height: 22, padding: '0 6px', border: `1px solid ${accent.c}`, borderRadius: 4, fontSize: 12, outline: 'none', background: T.inputBg, color: T.text }} />
+                ) : (
+                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: isSel ? 500 : 400 }}>
+                    {item.name}
+                  </span>
+                )}
+                {!isRenaming && hasTags && itemTags.map(t => {
+                  const tag = tagDefs.find(x => x.id === t)
+                  return tag && <div key={t} style={{ width: 6, height: 6, borderRadius: 99, background: `oklch(0.62 0.16 ${tag.hue})`, flex: 'none' }} />
+                })}
+                {!isRenaming && item.isDirectory && (
+                  <IconChevronRight size={11} color={isSel && !isMulti ? 'rgba(255,255,255,0.85)' : T.textFaint} />
+                )}
+              </button>
 
-            {/* Hover action buttons */}
-            {isHovered && !isRenaming && (
-              <>
-                {onRename && (
-                  <HoverBtn
-                    right={52}
-                    title="Rename"
-                    onClick={(e) => startRename(item, e)}
-                    hoverColor="rgba(111,76,179,0.12)"
-                    hoverIconColor="#6f4cb3">
-                    <IconRename size={11} />
-                  </HoverBtn>
-                )}
-                {onCopy && (
-                  <HoverBtn
-                    right={30}
-                    title="Duplicate"
-                    onClick={(e) => { e.stopPropagation(); onCopy(item) }}
-                    hoverColor="rgba(0,131,143,0.1)"
-                    hoverIconColor="#00838f">
-                    <IconCopy size={11} />
-                  </HoverBtn>
-                )}
-                {onDelete && (
-                  <HoverBtn
-                    right={6}
-                    title="Move to Trash"
-                    onClick={(e) => { e.stopPropagation(); onDelete(item) }}
-                    hoverColor="rgba(220,50,50,0.1)"
-                    hoverIconColor="#e53e3e">
-                    <IconTrash size={12} />
-                  </HoverBtn>
-                )}
-              </>
-            )}
+              {isHovered && !isRenaming && (
+                <>
+                  {onRename && <HoverBtn right={52} title="Rename" onClick={(e) => startRename(item, e)} hoverColor="rgba(111,76,179,0.15)" hoverIconColor="#9d7ce0"><IconRename size={11} /></HoverBtn>}
+                  {onCopy && <HoverBtn right={30} title="Duplicate" onClick={(e) => { e.stopPropagation(); onCopy(item) }} hoverColor="rgba(0,131,143,0.12)" hoverIconColor="#00838f"><IconCopy size={11} /></HoverBtn>}
+                  {onDelete && <HoverBtn right={6} title="Move to Trash" onClick={(e) => { e.stopPropagation(); onDelete(item) }} hoverColor="rgba(220,50,50,0.12)" hoverIconColor="#e53e3e"><IconTrash size={12} /></HoverBtn>}
+                </>
+              )}
             </div>
           )
         })}
@@ -353,18 +323,15 @@ export default function CascadeColumn({
   )
 }
 
-function HeaderBtn({ children, onClick, active, title }) {
+function HeaderBtn({ children, onClick, active, title, T }) {
   return (
-    <button
-      onClick={onClick}
-      title={title}
-      style={{
-        width: 18, height: 18, border: 'none',
-        background: active ? 'rgba(111,76,179,0.14)' : 'transparent',
-        borderRadius: 3,
-        color: active ? '#6f4cb3' : '#888',
-        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
+    <button onClick={onClick} title={title} style={{
+      width: 18, height: 18, border: 'none',
+      background: active ? 'rgba(111,76,179,0.14)' : 'transparent',
+      borderRadius: 3,
+      color: active ? '#6f4cb3' : T.textDim,
+      cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
       {children}
     </button>
   )
@@ -373,17 +340,13 @@ function HeaderBtn({ children, onClick, active, title }) {
 function HoverBtn({ children, right, title, onClick, hoverColor, hoverIconColor }) {
   const [hov, setHov] = React.useState(false)
   return (
-    <button
-      onClick={onClick}
-      title={title}
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
+    <button onClick={onClick} title={title}
+      onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
       style={{
         position: 'absolute', right,
         width: 20, height: 20, border: 'none', borderRadius: 4,
         background: hov ? hoverColor : 'transparent',
-        cursor: 'pointer',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
         color: hov ? hoverIconColor : '#999',
         transition: 'background 0.1s, color 0.1s',
       }}>

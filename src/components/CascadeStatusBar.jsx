@@ -1,6 +1,8 @@
 import React from 'react'
+import { useTheme } from '../contexts/ThemeContext'
 
 export default function CascadeStatusBar({ cascade, multiSel, nodeMap, accent }) {
+  const { T } = useTheme()
   const lastPath = cascade[cascade.length - 1]
   const lastNode = nodeMap[lastPath]
 
@@ -22,14 +24,14 @@ export default function CascadeStatusBar({ cascade, multiSel, nodeMap, accent })
     <div style={{
       height: 26, padding: '0 14px',
       display: 'flex', alignItems: 'center', gap: 12,
-      background: 'rgba(248,245,253,0.85)',
-      borderTop: '1px solid rgba(0,0,0,0.06)',
-      fontSize: 11, color: '#666', flexShrink: 0,
+      background: T.statusBg,
+      borderTop: `1px solid ${T.border}`,
+      fontSize: 11, color: T.textSub, flexShrink: 0,
     }}>
       <span>{cascade.length - 1} level{cascade.length !== 2 ? 's' : ''} deep</span>
 
       {lastNode && (
-        <span style={{ color: '#444' }}>
+        <span style={{ color: T.textMid }}>
           · {lastNode.name}
           {lastNode.size ? ` · ${lastNode.size}` : ''}
         </span>

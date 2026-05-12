@@ -1,15 +1,18 @@
 import React from 'react'
 import { FileTile, kindLabel, IconEye, IconShare, IconStar, IconCopy, IconMore, IconPlus } from './icons'
 import { AIActions } from './features'
+import { useTheme } from '../contexts/ThemeContext'
 
 const HUE_PRESETS = [15, 45, 80, 145, 185, 235, 290, 330]
 
 export default function CascadeDeepPreview({ item, accent, tagMap, onToggleTag, tagDefs = [], onAddTag }) {
+  const { T } = useTheme()
+
   if (!item) return (
     <div style={{
-      flex: 1, minWidth: 300, background: 'rgba(255,255,255,0.85)',
+      flex: 1, minWidth: 300, background: T.previewBg,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      color: '#999', fontSize: 13, flexDirection: 'column', gap: 10,
+      color: T.textDim, fontSize: 13, flexDirection: 'column', gap: 10,
     }}>
       <FileTile kind="folder" size={48} />
       <span>Select a file to preview</span>
@@ -18,7 +21,7 @@ export default function CascadeDeepPreview({ item, accent, tagMap, onToggleTag, 
 
   return (
     <div style={{
-      flex: 1, minWidth: 300, background: 'rgba(255,255,255,0.85)',
+      flex: 1, minWidth: 300, background: T.previewBg,
       display: 'flex', flexDirection: 'column', overflow: 'auto',
       scrollSnapAlign: 'start',
     }}>
@@ -26,16 +29,16 @@ export default function CascadeDeepPreview({ item, accent, tagMap, onToggleTag, 
 
       {/* Name + kind */}
       <div style={{ padding: '14px 18px 6px' }}>
-        <div style={{ fontSize: 16, fontWeight: 600, color: '#1a1a1a', wordBreak: 'break-word', lineHeight: 1.3 }}>
+        <div style={{ fontSize: 16, fontWeight: 600, color: T.text, wordBreak: 'break-word', lineHeight: 1.3 }}>
           {item.name}
         </div>
-        <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>
+        <div style={{ fontSize: 12, color: T.textSub, marginTop: 2 }}>
           {kindLabel(item.kind)}{item.size ? ` · ${item.size}` : ''}
         </div>
       </div>
 
       {/* Quick actions */}
-      <div style={{ padding: '8px 14px', display: 'flex', gap: 4, borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+      <div style={{ padding: '8px 14px', display: 'flex', gap: 4, borderBottom: `1px solid ${T.border}` }}>
         <PvAction icon={<IconEye size={13} />} label="Open" primary accent={accent}
           onClick={() => window.electronAPI?.openExternal(item.path)} />
         <PvAction icon={<IconShare size={13} />} label="Show" accent={accent}
@@ -55,9 +58,9 @@ export default function CascadeDeepPreview({ item, accent, tagMap, onToggleTag, 
           ['Duration', item.duration],
           ['Path', item.path],
         ].filter(r => r[1]).map(([k, v]) => (
-          <div key={k} style={{ display: 'flex', fontSize: 12, padding: '5px 0', borderTop: '1px solid rgba(0,0,0,0.05)' }}>
-            <div style={{ width: 80, color: '#888', flexShrink: 0 }}>{k}</div>
-            <div style={{ flex: 1, color: '#222', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: k === 'Path' ? 'nowrap' : 'normal' }}>{String(v)}</div>
+          <div key={k} style={{ display: 'flex', fontSize: 12, padding: '5px 0', borderTop: `1px solid ${T.border}` }}>
+            <div style={{ width: 80, color: T.textSub, flexShrink: 0 }}>{k}</div>
+            <div style={{ flex: 1, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: k === 'Path' ? 'nowrap' : 'normal' }}>{String(v)}</div>
           </div>
         ))}
       </div>
@@ -71,6 +74,7 @@ export default function CascadeDeepPreview({ item, accent, tagMap, onToggleTag, 
 }
 
 function TagEditor({ item, tagDefs, tagMap, onToggleTag, onAddTag, accent }) {
+  const { T } = useTheme()
   const [addingTag, setAddingTag] = React.useState(false)
   const [newTagName, setNewTagName] = React.useState('')
   const [newTagHue, setNewTagHue] = React.useState(235)
@@ -87,7 +91,7 @@ function TagEditor({ item, tagDefs, tagMap, onToggleTag, onAddTag, accent }) {
 
   return (
     <div style={{ padding: '0 18px 14px' }}>
-      <div style={{ fontSize: 10.5, fontWeight: 600, color: '#888', letterSpacing: 0.5, padding: '6px 0 8px', textTransform: 'uppercase' }}>Tags</div>
+      <div style={{ fontSize: 10.5, fontWeight: 600, color: T.textSub, letterSpacing: 0.5, padding: '6px 0 8px', textTransform: 'uppercase' }}>Tags</div>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         {tagDefs.map(t => {
           const active = activeTags.includes(t.id)
@@ -95,8 +99,8 @@ function TagEditor({ item, tagDefs, tagMap, onToggleTag, onAddTag, accent }) {
             <button key={t.id} onClick={() => onToggleTag?.(item.path, t.id)} style={{
               fontSize: 11, padding: '3px 9px', borderRadius: 99,
               background: active ? `oklch(0.94 0.05 ${t.hue})` : 'transparent',
-              color: active ? `oklch(0.35 0.14 ${t.hue})` : '#666',
-              border: active ? `1px solid oklch(0.86 0.06 ${t.hue})` : '1px dashed rgba(0,0,0,0.18)',
+              color: active ? `oklch(0.35 0.14 ${t.hue})` : T.textSub,
+              border: active ? `1px solid oklch(0.86 0.06 ${t.hue})` : `1px dashed ${T.borderMid}`,
               cursor: 'pointer', fontWeight: 500,
               display: 'flex', alignItems: 'center', gap: 5,
             }}>
@@ -109,8 +113,8 @@ function TagEditor({ item, tagDefs, tagMap, onToggleTag, onAddTag, accent }) {
           onClick={() => { setAddingTag(v => !v); setNewTagName(''); setNewTagHue(235) }}
           style={{
             fontSize: 11, padding: '3px 9px', borderRadius: 99, background: 'transparent',
-            color: addingTag ? accent?.c : '#888',
-            border: addingTag ? `1px solid ${accent?.c}` : '1px dashed rgba(0,0,0,0.18)',
+            color: addingTag ? accent?.c : T.textSub,
+            border: addingTag ? `1px solid ${accent?.c}` : `1px dashed ${T.borderMid}`,
             cursor: 'pointer',
             display: 'flex', alignItems: 'center', gap: 4,
           }}>
@@ -119,7 +123,7 @@ function TagEditor({ item, tagDefs, tagMap, onToggleTag, onAddTag, accent }) {
       </div>
 
       {addingTag && (
-        <div style={{ marginTop: 8, padding: '8px 10px', background: 'rgba(0,0,0,0.03)', borderRadius: 8 }}>
+        <div style={{ marginTop: 8, padding: '8px 10px', background: T.hoverBg, borderRadius: 8 }}>
           <input
             autoFocus
             value={newTagName}
@@ -128,9 +132,9 @@ function TagEditor({ item, tagDefs, tagMap, onToggleTag, onAddTag, accent }) {
             placeholder="Tag name…"
             style={{
               width: '100%', height: 26, padding: '0 8px',
-              border: '1px solid rgba(0,0,0,0.12)', borderRadius: 5,
-              fontSize: 11.5, outline: 'none', background: '#fff',
-              boxSizing: 'border-box',
+              border: `1px solid ${T.inputBorder}`, borderRadius: 5,
+              fontSize: 11.5, outline: 'none', background: T.inputBg,
+              color: T.text, boxSizing: 'border-box',
             }}
           />
           <div style={{ display: 'flex', gap: 5, marginTop: 7, flexWrap: 'wrap' }}>
@@ -160,8 +164,8 @@ function TagEditor({ item, tagDefs, tagMap, onToggleTag, onAddTag, accent }) {
             <button
               onClick={() => setAddingTag(false)}
               style={{
-                flex: 1, height: 24, border: '1px solid rgba(0,0,0,0.1)', borderRadius: 5,
-                background: 'transparent', color: '#555',
+                flex: 1, height: 24, border: `1px solid ${T.borderMid}`, borderRadius: 5,
+                background: 'transparent', color: T.textSub,
                 fontSize: 11, cursor: 'pointer',
               }}>
               Cancel
@@ -174,6 +178,7 @@ function TagEditor({ item, tagDefs, tagMap, onToggleTag, onAddTag, accent }) {
 }
 
 function PreviewHero({ item }) {
+  const { T } = useTheme()
   const [textPreview, setTextPreview] = React.useState(null)
 
   React.useEffect(() => {
@@ -231,12 +236,12 @@ function PreviewHero({ item }) {
       <div style={{
         height: 240, padding: 18,
         fontFamily: 'ui-monospace, "SF Mono", Consolas, monospace',
-        fontSize: 11.5, color: '#3a3a3a',
+        fontSize: 11.5, color: T.text,
         whiteSpace: 'pre-wrap', overflow: 'hidden',
-        position: 'relative', lineHeight: 1.55, background: '#fbfaf6',
+        position: 'relative', lineHeight: 1.55, background: T.codeBg,
       }}>
         {textPreview}
-        <div style={{ position: 'absolute', inset: 'auto 0 0 0', height: 60, background: 'linear-gradient(transparent, #fbfaf6)' }} />
+        <div style={{ position: 'absolute', inset: 'auto 0 0 0', height: 60, background: `linear-gradient(transparent, ${T.codeBg})` }} />
       </div>
     )
   }
@@ -274,6 +279,7 @@ function PreviewHero({ item }) {
 }
 
 function PvAction({ icon, label, primary, accent, onClick }) {
+  const { T } = useTheme()
   const [hov, setHov] = React.useState(false)
   return (
     <button
@@ -284,8 +290,8 @@ function PvAction({ icon, label, primary, accent, onClick }) {
         flex: label ? 1 : 'none', height: 30,
         padding: label ? '0 12px' : '0 9px',
         border: 'none',
-        background: primary ? accent.c : (hov ? 'rgba(0,0,0,0.05)' : 'transparent'),
-        color: primary ? '#fff' : '#333', borderRadius: 6,
+        background: primary ? accent.c : (hov ? T.hoverBg : 'transparent'),
+        color: primary ? '#fff' : T.text, borderRadius: 6,
         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
         fontSize: 12, fontWeight: primary ? 600 : 500, cursor: 'pointer',
       }}>

@@ -46,6 +46,8 @@ export const IconBack = (p) => <Ic d="M15 18l-6-6 6-6" {...p} />
 export const IconForward = (p) => <Ic d="M9 18l6-6-6-6" {...p} />
 export const IconWindow = (p) => <Ic d={<><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></>} {...p} />
 export const IconFolderOpen = (p) => <Ic d="M5 19a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h4l2 2h4a2 2 0 0 1 2 2v1M5 19h14a2 2 0 0 0 2-2v-5a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v2" {...p} />
+export const IconMoon = (p) => <Ic d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 1 0 9.8 9.8z" {...p} />
+export const IconSun = (p) => <Ic d="M12 7a5 5 0 1 0 0 10A5 5 0 0 0 12 7zM12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" {...p} />
 
 // File-type tile
 export function FileTile({ kind, name, size = 36, palette }) {

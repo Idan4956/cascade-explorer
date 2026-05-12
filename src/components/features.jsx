@@ -4,6 +4,7 @@ import {
   IconClose, IconGallery, IconPlay, IconClock, IconPlus, IconCommand,
   IconEye, IconInfo, IconStar, FileTile
 } from './icons'
+import { useTheme } from '../contexts/ThemeContext'
 
 const TAGS = [
   { id: 'important', name: 'Important', hue: 12 },
@@ -13,6 +14,8 @@ const TAGS = [
 
 // ─────────── Context menu ───────────
 export function ContextMenu({ x, y, onClose, items, accent }) {
+  const { T } = useTheme()
+
   React.useEffect(() => {
     const close = () => onClose()
     window.addEventListener('click', close)
@@ -42,14 +45,14 @@ export function ContextMenu({ x, y, onClose, items, accent }) {
   return (
     <div ref={ref} onClick={(e) => e.stopPropagation()} style={{
       position: 'fixed', left: pos.x, top: pos.y, zIndex: 9999, width: 240,
-      background: 'rgba(252,251,253,0.98)', backdropFilter: 'blur(20px) saturate(160%)',
-      border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8,
+      background: T.modalBg, backdropFilter: 'blur(20px) saturate(160%)',
+      border: `1px solid ${T.borderMid}`, borderRadius: 8,
       boxShadow: '0 18px 44px rgba(0,0,0,0.22), 0 2px 6px rgba(0,0,0,0.08)',
       padding: 6, fontSize: 12.5,
       fontFamily: '"Segoe UI Variable", "Segoe UI", system-ui, sans-serif',
     }}>
       {items.map((it, i) => {
-        if (it.divider) return <div key={i} style={{ height: 1, background: 'rgba(0,0,0,0.07)', margin: '4px 8px' }} />
+        if (it.divider) return <div key={i} style={{ height: 1, background: T.border, margin: '4px 8px' }} />
         return <CtxItem key={i} item={it} accent={accent} openSub={openSub} setOpenSub={setOpenSub} index={i} />
       })}
     </div>
@@ -57,6 +60,7 @@ export function ContextMenu({ x, y, onClose, items, accent }) {
 }
 
 function CtxItem({ item, accent, openSub, setOpenSub, index }) {
+  const { T } = useTheme()
   const [hov, setHov] = React.useState(false)
   const showSub = item.sub && openSub === index
   return (
@@ -66,30 +70,30 @@ function CtxItem({ item, accent, openSub, setOpenSub, index }) {
       <button onClick={item.onClick} disabled={item.disabled} style={{
         width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px',
         border: 'none', background: hov && !item.disabled ? accent.soft : 'transparent', borderRadius: 5,
-        color: item.disabled ? '#aaa' : (item.danger ? '#c83a2e' : '#222'),
+        color: item.disabled ? T.textFaint : (item.danger ? '#c83a2e' : T.text),
         cursor: item.disabled ? 'default' : 'pointer', textAlign: 'left', fontFamily: 'inherit', fontSize: 'inherit',
       }}>
-        <span style={{ width: 14, display: 'flex', justifyContent: 'center', color: '#666' }}>{item.icon}</span>
+        <span style={{ width: 14, display: 'flex', justifyContent: 'center', color: T.textSub }}>{item.icon}</span>
         <span style={{ flex: 1 }}>{item.label}</span>
-        {item.kbd && <kbd style={{ fontSize: 10, color: '#888', fontFamily: 'inherit' }}>{item.kbd}</kbd>}
-        {item.sub && <IconChevronRight size={11} color="#888" />}
+        {item.kbd && <kbd style={{ fontSize: 10, color: T.textDim, fontFamily: 'inherit' }}>{item.kbd}</kbd>}
+        {item.sub && <IconChevronRight size={11} color={T.textDim} />}
       </button>
       {showSub && (
         <div style={{
           position: 'absolute', left: '100%', top: -6, marginLeft: 4, width: 200,
-          background: 'rgba(252,251,253,0.98)', backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8,
+          background: T.modalBg, backdropFilter: 'blur(20px)',
+          border: `1px solid ${T.borderMid}`, borderRadius: 8,
           boxShadow: '0 18px 44px rgba(0,0,0,0.22)', padding: 6,
         }}>
           {item.sub.map((s, j) => (
             <button key={j} onClick={s.onClick} style={{
               width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '6px 10px',
-              border: 'none', background: 'transparent', borderRadius: 5, color: '#222',
+              border: 'none', background: 'transparent', borderRadius: 5, color: T.text,
               cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', fontSize: 12.5,
             }}
               onMouseEnter={(e) => e.currentTarget.style.background = accent.soft}
               onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}>
-              <span style={{ width: 14, color: '#666' }}>{s.icon}</span>
+              <span style={{ width: 14, color: T.textSub }}>{s.icon}</span>
               <span style={{ flex: 1 }}>{s.label}</span>
             </button>
           ))}
@@ -144,6 +148,7 @@ function SbBtn({ icon, label, danger, onClick }) {
 
 // ─────────── Batch rename modal ───────────
 export function BatchRenameModal({ items, onClose, onRename, accent }) {
+  const { T } = useTheme()
   const [find, setFind] = React.useState('')
   const [replace, setReplace] = React.useState('')
   const [prefix, setPrefix] = React.useState('')
@@ -177,52 +182,52 @@ export function BatchRenameModal({ items, onClose, onRename, accent }) {
       display: 'flex', justifyContent: 'center', alignItems: 'center',
     }}>
       <div onClick={(e) => e.stopPropagation()} style={{
-        width: 560, maxHeight: '80%', background: 'rgba(252,251,253,0.98)', backdropFilter: 'blur(28px)',
+        width: 560, maxHeight: '80%', background: T.modalBg, backdropFilter: 'blur(28px)',
         borderRadius: 12, boxShadow: '0 32px 80px rgba(0,0,0,0.3), 0 8px 16px rgba(0,0,0,0.1)',
-        border: '1px solid rgba(0,0,0,0.08)', overflow: 'hidden', display: 'flex', flexDirection: 'column',
-        fontFamily: '"Segoe UI Variable", "Segoe UI", system-ui, sans-serif',
+        border: `1px solid ${T.border}`, overflow: 'hidden', display: 'flex', flexDirection: 'column',
+        fontFamily: '"Segoe UI Variable", "Segoe UI", system-ui, sans-serif', color: T.text,
       }}>
-        <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(0,0,0,0.07)', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ padding: '14px 18px', borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', gap: 10 }}>
           <IconRename size={16} color={accent.c} />
           <span style={{ fontSize: 14, fontWeight: 600 }}>Batch rename · {items.length} items</span>
           <div style={{ flex: 1 }} />
-          <button onClick={onClose} style={{ width: 26, height: 26, border: 'none', background: 'transparent', borderRadius: 4, cursor: 'pointer', color: '#666', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <button onClick={onClose} style={{ width: 26, height: 26, border: 'none', background: 'transparent', borderRadius: 4, cursor: 'pointer', color: T.textSub, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <IconClose size={12} />
           </button>
         </div>
         <div style={{ padding: 18, overflow: 'auto' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <BrField label="Find"><input value={find} onChange={(e) => setFind(e.target.value)} style={brInputStyle} placeholder="text to find" /></BrField>
-            <BrField label="Replace with"><input value={replace} onChange={(e) => setReplace(e.target.value)} style={brInputStyle} placeholder="replacement" /></BrField>
-            <BrField label="Prefix"><input value={prefix} onChange={(e) => setPrefix(e.target.value)} style={brInputStyle} placeholder="add to start" /></BrField>
-            <BrField label="Suffix"><input value={suffix} onChange={(e) => setSuffix(e.target.value)} style={brInputStyle} placeholder="add to end (before ext)" /></BrField>
+            <BrField label="Find"><input value={find} onChange={(e) => setFind(e.target.value)} style={brInputStyle(T)} placeholder="text to find" /></BrField>
+            <BrField label="Replace with"><input value={replace} onChange={(e) => setReplace(e.target.value)} style={brInputStyle(T)} placeholder="replacement" /></BrField>
+            <BrField label="Prefix"><input value={prefix} onChange={(e) => setPrefix(e.target.value)} style={brInputStyle(T)} placeholder="add to start" /></BrField>
+            <BrField label="Suffix"><input value={suffix} onChange={(e) => setSuffix(e.target.value)} style={brInputStyle(T)} placeholder="add to end (before ext)" /></BrField>
           </div>
-          <div style={{ marginTop: 12, padding: 12, border: '1px solid rgba(0,0,0,0.08)', borderRadius: 8, background: 'rgba(0,0,0,0.02)' }}>
+          <div style={{ marginTop: 12, padding: 12, border: `1px solid ${T.border}`, borderRadius: 8, background: 'rgba(0,0,0,0.02)' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, cursor: 'pointer' }}>
               <input type="checkbox" checked={useNum} onChange={(e) => setUseNum(e.target.checked)} style={{ accentColor: accent.c }} />
               Append sequence number
             </label>
             {useNum && (
               <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
-                <BrField label="Start at"><input type="number" value={numFrom} onChange={(e) => setNumFrom(e.target.value)} style={brInputStyle} /></BrField>
-                <BrField label="Padding"><input type="number" value={pad} onChange={(e) => setPad(e.target.value)} style={brInputStyle} /></BrField>
+                <BrField label="Start at"><input type="number" value={numFrom} onChange={(e) => setNumFrom(e.target.value)} style={brInputStyle(T)} /></BrField>
+                <BrField label="Padding"><input type="number" value={pad} onChange={(e) => setPad(e.target.value)} style={brInputStyle(T)} /></BrField>
               </div>
             )}
           </div>
-          <div style={{ marginTop: 14, fontSize: 11, fontWeight: 600, color: '#666', letterSpacing: 0.4, textTransform: 'uppercase' }}>Preview</div>
-          <div style={{ marginTop: 8, maxHeight: 220, overflow: 'auto', border: '1px solid rgba(0,0,0,0.07)', borderRadius: 6 }}>
+          <div style={{ marginTop: 14, fontSize: 11, fontWeight: 600, color: T.textSub, letterSpacing: 0.4, textTransform: 'uppercase' }}>Preview</div>
+          <div style={{ marginTop: 8, maxHeight: 220, overflow: 'auto', border: `1px solid ${T.border}`, borderRadius: 6 }}>
             {items.slice(0, 30).map((it, i) => (
-              <div key={it.id || i} style={{ display: 'flex', gap: 12, padding: '7px 10px', borderTop: i ? '1px solid rgba(0,0,0,0.04)' : 'none', fontSize: 12 }}>
+              <div key={it.id || i} style={{ display: 'flex', gap: 12, padding: '7px 10px', borderTop: i ? `1px solid ${T.border}` : 'none', fontSize: 12 }}>
                 <FileTile kind={it.kind} name={it.name} size={16} />
-                <div style={{ flex: 1, color: '#888', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.name}</div>
-                <IconChevronRight size={11} color="#aaa" />
+                <div style={{ flex: 1, color: T.textSub, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.name}</div>
+                <IconChevronRight size={11} color={T.textDim} />
                 <div style={{ flex: 1, color: accent.c, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{apply(it.name, i)}</div>
               </div>
             ))}
           </div>
         </div>
-        <div style={{ padding: '12px 18px', borderTop: '1px solid rgba(0,0,0,0.07)', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <button onClick={onClose} style={{ height: 32, padding: '0 14px', background: 'transparent', border: '1px solid rgba(0,0,0,0.12)', borderRadius: 6, fontSize: 12.5, cursor: 'pointer', color: '#222' }}>Cancel</button>
+        <div style={{ padding: '12px 18px', borderTop: `1px solid ${T.border}`, display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <button onClick={onClose} style={{ height: 32, padding: '0 14px', background: 'transparent', border: `1px solid ${T.borderMid}`, borderRadius: 6, fontSize: 12.5, cursor: 'pointer', color: T.text }}>Cancel</button>
           <button onClick={handleRename} style={{ height: 32, padding: '0 16px', background: accent.c, color: '#fff', border: 'none', borderRadius: 6, fontSize: 12.5, cursor: 'pointer', fontWeight: 600 }}>Rename {items.length} items</button>
         </div>
       </div>
@@ -230,7 +235,7 @@ export function BatchRenameModal({ items, onClose, onRename, accent }) {
   )
 }
 
-const brInputStyle = { width: '100%', height: 30, padding: '0 10px', border: '1px solid rgba(0,0,0,0.12)', borderRadius: 6, fontSize: 12.5, outline: 'none', background: '#fff', color: '#222' }
+const brInputStyle = (T) => ({ width: '100%', height: 30, padding: '0 10px', border: `1px solid ${T.inputBorder}`, borderRadius: 6, fontSize: 12.5, outline: 'none', background: T.inputBg, color: T.text })
 
 function BrField({ label, children }) {
   return (
@@ -243,6 +248,7 @@ function BrField({ label, children }) {
 
 // ─────────── Quick-filter chip row ───────────
 export function QuickFilters({ filters, setFilters, accent }) {
+  const { T } = useTheme()
   const chips = [
     { id: 'kind:image', label: 'Images', icon: <IconGallery size={11} /> },
     { id: 'kind:video', label: 'Videos', icon: <IconPlay size={10} /> },
@@ -267,15 +273,15 @@ export function QuickFilters({ filters, setFilters, accent }) {
           }}>✕ Clear</button>
         </div>
       )}
-      <div style={{ display: 'flex', gap: 6, padding: '6px 14px', overflow: 'auto', background: 'rgba(252,251,253,0.5)' }}>
+      <div style={{ display: 'flex', gap: 6, padding: '6px 14px', overflow: 'auto', background: T.qfBg }}>
         {chips.map(c => {
           const active = filters[c.id]
           return (
             <button key={c.id} onClick={() => setFilters({ ...filters, [c.id]: !active })} style={{
               height: 24, padding: '0 11px', borderRadius: 99,
-              border: active ? `1px solid ${accent.c}` : '1px solid rgba(0,0,0,0.1)',
+              border: active ? `1px solid ${accent.c}` : `1px solid ${T.borderMid}`,
               background: active ? accent.soft : 'transparent',
-              color: active ? accent.c : '#444', fontSize: 11.5, fontWeight: active ? 600 : 400,
+              color: active ? accent.c : T.textMid, fontSize: 11.5, fontWeight: active ? 600 : 400,
               cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap',
             }}>
               {c.icon}
@@ -290,6 +296,7 @@ export function QuickFilters({ filters, setFilters, accent }) {
 
 // ─────────── Shortcuts cheat sheet ───────────
 export function ShortcutsModal({ onClose, accent }) {
+  const { T } = useTheme()
   const groups = [
     { title: 'Navigation', items: [
       ['Back / Forward', 'Alt + ← / →'],
@@ -326,27 +333,27 @@ export function ShortcutsModal({ onClose, accent }) {
       display: 'flex', justifyContent: 'center', alignItems: 'center',
     }}>
       <div onClick={(e) => e.stopPropagation()} style={{
-        width: 620, background: 'rgba(252,251,253,0.98)', backdropFilter: 'blur(28px)',
-        borderRadius: 12, border: '1px solid rgba(0,0,0,0.08)',
+        width: 620, background: T.modalBg, backdropFilter: 'blur(28px)',
+        borderRadius: 12, border: `1px solid ${T.border}`,
         boxShadow: '0 32px 80px rgba(0,0,0,0.3)', overflow: 'hidden',
-        fontFamily: '"Segoe UI Variable", "Segoe UI", system-ui, sans-serif',
+        fontFamily: '"Segoe UI Variable", "Segoe UI", system-ui, sans-serif', color: T.text,
       }}>
-        <div style={{ padding: '14px 18px', borderBottom: '1px solid rgba(0,0,0,0.07)', display: 'flex', alignItems: 'center' }}>
+        <div style={{ padding: '14px 18px', borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center' }}>
           <IconCommand size={16} color={accent.c} />
           <span style={{ marginLeft: 10, fontSize: 14, fontWeight: 600 }}>Keyboard shortcuts</span>
           <div style={{ flex: 1 }} />
-          <button onClick={onClose} style={{ width: 26, height: 26, border: 'none', background: 'transparent', borderRadius: 4, cursor: 'pointer', color: '#666', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <button onClick={onClose} style={{ width: 26, height: 26, border: 'none', background: 'transparent', borderRadius: 4, cursor: 'pointer', color: T.textSub, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <IconClose size={12} />
           </button>
         </div>
         <div style={{ padding: 18, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
           {groups.map(g => (
             <div key={g.title}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#888', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 6 }}>{g.title}</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: T.textDim, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 6 }}>{g.title}</div>
               {g.items.map(([k, v]) => (
-                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', fontSize: 12.5, borderBottom: '1px solid rgba(0,0,0,0.04)' }}>
-                  <span style={{ color: '#222' }}>{k}</span>
-                  <kbd style={{ fontSize: 11, padding: '2px 7px', background: 'rgba(0,0,0,0.05)', borderRadius: 4, color: '#444' }}>{v}</kbd>
+                <div key={k} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', fontSize: 12.5, borderBottom: `1px solid ${T.border}` }}>
+                  <span style={{ color: T.text }}>{k}</span>
+                  <kbd style={{ fontSize: 11, padding: '2px 7px', background: T.hoverBg, borderRadius: 4, color: T.textMid }}>{v}</kbd>
                 </div>
               ))}
             </div>
@@ -359,6 +366,7 @@ export function ShortcutsModal({ onClose, accent }) {
 
 // ─────────── AI quick actions strip ───────────
 export function AIActions({ item, accent }) {
+  const { T } = useTheme()
   if (!item) return null
   const actions = (() => {
     if (item.kind === 'image') return [
@@ -387,7 +395,7 @@ export function AIActions({ item, accent }) {
     return [{ icon: '✨', label: 'Open with AI' }]
   })()
   return (
-    <div style={{ padding: '10px 14px 12px', borderTop: '1px solid rgba(0,0,0,0.05)' }}>
+    <div style={{ padding: '10px 14px 12px', borderTop: `1px solid ${T.border}` }}>
       <div style={{ fontSize: 10.5, fontWeight: 600, color: '#888', letterSpacing: 0.5, padding: '4px 0 8px', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: 6 }}>
         <span style={{ background: `linear-gradient(135deg, ${accent.c}, oklch(0.65 0.18 280))`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', fontWeight: 700 }}>✨ Smart actions</span>
       </div>
@@ -396,12 +404,12 @@ export function AIActions({ item, accent }) {
           <button key={i}
             onClick={() => alert(`"${a.label}" requires an AI backend.\n\nTo enable Smart Actions, connect an API key in settings.`)}
             style={{
-              display: 'flex', alignItems: 'center', gap: 9, padding: '7px 10px', border: '1px solid rgba(0,0,0,0.06)',
-              background: 'rgba(255,255,255,0.5)', borderRadius: 6, cursor: 'pointer', fontSize: 12,
+              display: 'flex', alignItems: 'center', gap: 9, padding: '7px 10px', border: `1px solid ${T.border}`,
+              background: T.hoverBg, borderRadius: 6, cursor: 'pointer', fontSize: 12,
               color: '#222', textAlign: 'left',
             }}
             onMouseEnter={(e) => { e.currentTarget.style.background = accent.soft; e.currentTarget.style.borderColor = `${accent.c}33` }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.5)'; e.currentTarget.style.borderColor = 'rgba(0,0,0,0.06)' }}>
+            onMouseLeave={(e) => { e.currentTarget.style.background = T.hoverBg; e.currentTarget.style.borderColor = T.border }}>
             <span style={{ width: 16, textAlign: 'center' }}>{a.icon}</span>
             <span style={{ flex: 1 }}>{a.label}</span>
             <IconChevronRight size={11} color="#aaa" />
@@ -414,6 +422,7 @@ export function AIActions({ item, accent }) {
 
 // ─────────── Storage treemap ───────────
 export function StorageTreemap() {
+  const { T } = useTheme()
   const [disk, setDisk] = React.useState(null)
 
   React.useEffect(() => {
@@ -421,7 +430,7 @@ export function StorageTreemap() {
     if (api) api.diskUsage().then(setDisk)
   }, [])
 
-  if (!disk) return <div style={{ fontSize: 10.5, color: '#aaa' }}>Loading storage…</div>
+  if (!disk) return <div style={{ fontSize: 10.5, color: T.textFaint }}>Loading storage…</div>
 
   const fmt = (bytes) => {
     const gb = bytes / (1024 ** 3)
@@ -437,11 +446,11 @@ export function StorageTreemap() {
         <div title={`Used · ${fmt(disk.used)}`} style={{ flex: usedPct, background: usedPct > 0.9 ? '#c83a2e' : '#6f4cb3', minWidth: usedPct > 0 ? 4 : 0 }} />
         <div title={`Free · ${fmt(disk.free)}`} style={{ flex: freePct, background: 'rgba(0,0,0,0.08)' }} />
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10.5, color: '#666' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10.5, color: T.textSub }}>
         <span><span style={{ color: '#6f4cb3', fontWeight: 600 }}>●</span> Used {fmt(disk.used)}</span>
-        <span><span style={{ color: '#bbb' }}>●</span> Free {fmt(disk.free)}</span>
+        <span><span style={{ color: T.textDim }}>●</span> Free {fmt(disk.free)}</span>
       </div>
-      <div style={{ fontSize: 10, color: '#aaa', marginTop: 3 }}>{disk.drive} · {fmt(disk.total)} total</div>
+      <div style={{ fontSize: 10, color: T.textDim, marginTop: 3 }}>{disk.drive} · {fmt(disk.total)} total</div>
     </div>
   )
 }
