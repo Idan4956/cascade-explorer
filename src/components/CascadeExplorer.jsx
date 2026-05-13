@@ -5,10 +5,12 @@ import CascadeColumn from './CascadeColumn'
 import CascadeDeepPreview from './CascadeDeepPreview'
 import CascadeStatusBar from './CascadeStatusBar'
 import CommandPalette from './CommandPalette'
+import QuickLookModal from './QuickLookModal'
+import TabBar from './TabBar'
 import { CompareView, StackPreview as StackPreviewPanel } from './CompareAndStack'
 import { QuickFilters, SelectionBar, BatchRenameModal, ShortcutsModal, ContextMenu, TAGS as DEFAULT_TAGS } from './features'
 import { FileTile, IconEye, IconCopy, IconRename, IconTag, IconTrash, IconInfo, IconPin, IconWindow } from './icons'
-import { useSidebarSections, useDirectory, useRoots, clearDirCache } from '../hooks/useDirectory'
+import { useSidebarSections, useDirectory, useRoots, useGitStatus, clearDirCache } from '../hooks/useDirectory'
 import { ThemeProvider, useTheme } from '../contexts/ThemeContext'
 import SettingsModal from './SettingsModal'
 
@@ -49,10 +51,79 @@ function CascadeExplorerInner({ homedir, accent: accentProp = 'blue' }) {
 
   const A = ACCENTS[accentKey] || ACCENTS.purple
 
-  const [cascade, setCascade] = React.useState(homedir ? [homedir] : [])
+  // ── Tabs ─────────────────────────────────────────────────────────
+  const makeTab = (cascade) => ({ id: Date.now() + Math.random(), cascade, history: [], forwardHistory: [] })
+  const [tabs, setTabs] = React.useState(() => [makeTab(homedir ? [homedir] : [])])
+  const [activeTabId, setActiveTabId] = React.useState(() => tabs[0].id)
+  const activeTab = tabs.find(t => t.id === activeTabId) || tabs[0]
+
+  const [cascade, _setCascade] = React.useState(homedir ? [homedir] : [])
+  const [history, setHistory] = React.useState([])
+  const [forwardHistory, setForwardHistory] = React.useState([])
+
   React.useEffect(() => {
-    if (homedir && cascade.length === 0) setCascade([homedir])
+    if (homedir && cascade.length === 0) _setCascade([homedir])
   }, [homedir])
+
+  // Sync cascade <-> active tab
+  const switchTab = React.useCallback((id) => {
+    setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, cascade, history, forwardHistory } : t))
+    const tab = tabs.find(t => t.id === id)
+    if (tab) { _setCascade(tab.cascade); setHistory(tab.history); setForwardHistory(tab.forwardHistory) }
+    setActiveTabId(id)
+    setMultiSel({})
+  }, [activeTabId, cascade, history, forwardHistory, tabs])
+
+  const newTab = React.useCallback(() => {
+    setTabs(prev => { const t = makeTab(homedir ? [homedir] : []); return [...prev, t] })
+    setTabs(prev => {
+      const last = prev[prev.length - 1]
+      setActiveTabId(last.id)
+      _setCascade(last.cascade)
+      setHistory([])
+      setForwardHistory([])
+      setMultiSel({})
+      return prev
+    })
+  }, [homedir])
+
+  const closeTab = React.useCallback((id) => {
+    setTabs(prev => {
+      if (prev.length === 1) return prev
+      const idx = prev.findIndex(t => t.id === id)
+      const next = prev.filter(t => t.id !== id)
+      if (id === activeTabId) {
+        const fallback = next[Math.min(idx, next.length - 1)]
+        setActiveTabId(fallback.id)
+        _setCascade(fallback.cascade)
+        setHistory(fallback.history)
+        setForwardHistory(fallback.forwardHistory)
+        setMultiSel({})
+      }
+      return next
+    })
+  }, [activeTabId])
+
+  const tabsWithLabels = tabs.map(t => ({
+    ...t,
+    label: (t.id === activeTabId ? cascade : t.cascade).slice(-1)[0]?.split(/[\\/]/).pop() || 'Home',
+  }))
+
+  // ── Dual pane ─────────────────────────────────────────────────────
+  const [dualPane, setDualPane] = React.useState(false)
+  const [rightCascade, setRightCascade] = React.useState(homedir ? [homedir] : [])
+  const [rightMultiSel, setRightMultiSel] = React.useState({})
+  const [rightHistory, setRightHistory] = React.useState([])
+  const [rightForwardHistory, setRightForwardHistory] = React.useState([])
+  const [activePane, setActivePane] = React.useState('left')
+
+  const setCascade = React.useCallback((c) => {
+    if (activePane === 'right') setRightCascade(c)
+    else _setCascade(c)
+  }, [activePane])
+
+  // ── Quick Look ────────────────────────────────────────────────────
+  const [quickLookItem, setQuickLookItem] = React.useState(null)
 
   const [multiSel, setMultiSel] = React.useState({})
   const [pinnedCols, setPinnedCols] = React.useState(new Set())
@@ -65,8 +136,6 @@ function CascadeExplorerInner({ homedir, accent: accentProp = 'blue' }) {
   const [showRename, setShowRename] = React.useState(false)
   const [ctxMenu, setCtxMenu] = React.useState(null)
   const [stackMode, setStackMode] = React.useState(false)
-  const [history, setHistory] = React.useState([])
-  const [forwardHistory, setForwardHistory] = React.useState([])
   const [refreshKey, setRefreshKey] = React.useState(0)
   const [nodeMap, setNodeMap] = React.useState({})
   const [loadedDirs, setLoadedDirs] = React.useState({})
@@ -112,6 +181,10 @@ function CascadeExplorerInner({ homedir, accent: accentProp = 'blue' }) {
       })
     }
   }, [])
+
+  // ── Git status ────────────────────────────────────────────────────
+  const currentDir = cascade[cascade.length - 1]
+  const gitInfo = useGitStatus(currentDir)
 
   const saveTagDefs = React.useCallback((defs) => {
     setTagDefs(defs)
@@ -346,9 +419,16 @@ function CascadeExplorerInner({ homedir, accent: accentProp = 'blue' }) {
     const onKey = (e) => {
       if (e.target.tagName === 'INPUT') return
       const meta = e.metaKey || e.ctrlKey
+      if (e.key === ' ' && !meta) {
+        const target = flatMultiRef.current.length ? flatMultiRef.current[0] : lastSelItemsRef.current[0]
+        if (target && !target.isDirectory) { e.preventDefault(); setQuickLookItem(prev => prev?.path === target.path ? null : target) }
+        return
+      }
       if (meta && e.key === 'k') { e.preventDefault(); setPaletteOpen(true) }
       else if (meta && e.key === ',') { e.preventDefault(); setSettingsOpen(true) }
       else if (meta && e.key === '/') { e.preventDefault(); setShowShortcuts(true) }
+      else if (meta && e.key === 't') { e.preventDefault(); newTab() }
+      else if (meta && e.key === 'w') { e.preventDefault(); closeTab(activeTabId) }
       else if (e.key === 'F2') { e.preventDefault(); setShowRename(true) }
       else if (e.key === 'Backspace' && (e.metaKey || e.altKey)) { goBack() }
       else if (meta && e.key === 'c') {
@@ -365,7 +445,7 @@ function CascadeExplorerInner({ homedir, accent: accentProp = 'blue' }) {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [goBack, addToast, pasteItems])
+  }, [goBack, addToast, pasteItems, newTab, closeTab, activeTabId])
 
   // Refs for stable keyboard handler access
   const flatMultiRef = React.useRef([])
@@ -396,22 +476,50 @@ function CascadeExplorerInner({ homedir, accent: accentProp = 'blue' }) {
   const previewItem = lastIsFile ? lastNode : (lastSelItems.length === 1 ? lastSelItems[0] : null)
   const parentPath = cascade.length >= 2 ? cascade[cascade.length - 2] : null
 
+  // Right-pane navigation
+  const rightNavigateTo = React.useCallback((c) => {
+    setRightCascade(c); setRightHistory(h => [...h.slice(-9), rightCascade]); setRightForwardHistory([])
+  }, [rightCascade])
+  const rightGoBack = React.useCallback(() => {
+    if (!rightHistory.length) return
+    setRightForwardHistory(f => [...f.slice(-9), rightCascade])
+    setRightCascade(rightHistory[rightHistory.length - 1])
+    setRightHistory(h => h.slice(0, -1))
+  }, [rightHistory, rightCascade])
+  const rightGoForward = React.useCallback(() => {
+    if (!rightForwardHistory.length) return
+    setRightHistory(h => [...h.slice(-9), rightCascade])
+    setRightCascade(rightForwardHistory[rightForwardHistory.length - 1])
+    setRightForwardHistory(f => f.slice(0, -1))
+  }, [rightForwardHistory, rightCascade])
+
+  const colProps = { refreshKey, multiSel, colFilters, setColFilters, pinnedCols, quickFilters, showHidden, tagMap, tagDefs, activeTagFilter, cutPaths, starredPaths, starFilter, gitInfo, onEntries: registerEntries, accent: A, onDelete: (item) => deleteItems([item]), onRename: renameItem, onCopy: copyItem, onMove: moveItem, onToggleStar: toggleStar }
+
   return (
     <div style={{
       width: '100%', height: '100%',
       fontFamily: '"Segoe UI Variable", "Segoe UI", -apple-system, BlinkMacSystemFont, system-ui, sans-serif',
       color: T.text, display: 'flex', flexDirection: 'column',
       overflow: 'hidden', borderRadius: 8,
-      background: T.bg,
-      position: 'relative',
+      background: T.bg, position: 'relative',
     }}>
       <CascadeHeader
-        cascade={cascade} nodeMap={nodeMap} setCascade={navigateTo} openPalette={() => setPaletteOpen(true)}
-        history={history} canGoBack={history.length > 0} canGoForward={forwardHistory.length > 0}
-        onGoBack={goBack} onGoForward={goForward}
+        cascade={activePane === 'right' ? rightCascade : cascade}
+        nodeMap={nodeMap} setCascade={activePane === 'right' ? rightNavigateTo : navigateTo}
+        openPalette={() => setPaletteOpen(true)}
+        history={activePane === 'right' ? rightHistory : history}
+        canGoBack={activePane === 'right' ? rightHistory.length > 0 : history.length > 0}
+        canGoForward={activePane === 'right' ? rightForwardHistory.length > 0 : forwardHistory.length > 0}
+        onGoBack={activePane === 'right' ? rightGoBack : goBack}
+        onGoForward={activePane === 'right' ? rightGoForward : goForward}
         stackMode={stackMode} setStackMode={setStackMode} accent={A}
         onOpenSettings={() => setSettingsOpen(true)}
+        dualPane={dualPane} onToggleDualPane={() => setDualPane(v => !v)}
       />
+
+      {tabs.length > 1 && (
+        <TabBar tabs={tabsWithLabels} activeTabId={activeTabId} onSwitch={switchTab} onCreate={newTab} onClose={closeTab} accent={A} />
+      )}
 
       <QuickFilters filters={quickFilters} setFilters={setQuickFilters} accent={A} />
 
@@ -427,63 +535,62 @@ function CascadeExplorerInner({ homedir, accent: accentProp = 'blue' }) {
           starredCount={starredPaths.size}
         />
 
-        <div style={{ flex: 1, display: 'flex', overflow: 'auto', minWidth: 0, scrollSnapType: 'x mandatory', position: 'relative' }}>
-          {columnPaths.map((dirPath, depth) => (
-            <ColumnWithLoader
-              key={dirPath + refreshKey}
-              dirPath={dirPath}
-              selectedPath={cascade[depth + 1] || null}
-              multiSel={multiSel[depth + 1] || []}
-              filterText={colFilters[dirPath] || ''}
-              setFilter={(v) => setColFilters({ ...colFilters, [dirPath]: v })}
-              onSelect={(entry, e) => selectAt(depth + 1, entry, e)}
-              onContextMenu={(e, item) => onCtx(e, item, depth + 1)}
-              isPinned={pinnedCols.has(dirPath)}
-              onTogglePin={() => togglePin(dirPath)}
-              accent={A}
-              onEntries={registerEntries}
-              quickFilters={quickFilters}
-              showHidden={showHidden}
-              tagMap={tagMap}
-              tagDefs={tagDefs}
-              activeTagFilter={activeTagFilter}
-              onDelete={(item) => deleteItems([item])}
-              onRename={renameItem}
-              onCopy={copyItem}
-              onMove={moveItem}
-              cutPaths={cutPaths}
-              starredPaths={starredPaths}
-              onToggleStar={toggleStar}
-              starFilter={starFilter}
-            />
-          ))}
+        <div style={{ flex: 1, display: 'flex', minWidth: 0, overflow: 'hidden' }}>
+          {/* Left pane */}
+          <div
+            onClick={() => setActivePane('left')}
+            style={{
+              flex: 1, display: 'flex', overflow: 'auto', minWidth: 0,
+              scrollSnapType: 'x mandatory', position: 'relative',
+              outline: dualPane && activePane === 'left' ? `2px solid ${A.c}44` : 'none',
+              outlineOffset: -2,
+            }}>
+            <PaneColumns cascade={cascade} selectAt={selectAt} onCtx={onCtx} {...colProps} />
+            {!dualPane && (
+              stackMode && parentPath ? (
+                <StackPreviewLoader parentPath={parentPath} selectedPath={lastPath}
+                  onSelect={(e) => navigateTo([...cascade.slice(0, -1), e.path])} onEntries={registerEntries} />
+              ) : lastSelItems.length > 1 ? (
+                <CompareView items={lastSelItems} accent={A} />
+              ) : (
+                <CascadeDeepPreview item={previewItem} accent={A} tagMap={tagMap} onToggleTag={toggleTag} tagDefs={tagDefs} onAddTag={addTag} />
+              )
+            )}
+          </div>
 
-          {stackMode && parentPath ? (
-            <StackPreviewLoader
-              parentPath={parentPath} selectedPath={lastPath}
-              onSelect={(entry) => navigateTo([...cascade.slice(0, -1), entry.path])}
-              onEntries={registerEntries}
-            />
-          ) : lastSelItems.length > 1 ? (
-            <CompareView items={lastSelItems} accent={A} />
-          ) : (
-            <CascadeDeepPreview item={previewItem} accent={A} tagMap={tagMap} onToggleTag={toggleTag} tagDefs={tagDefs} onAddTag={addTag} />
+          {/* Right pane (dual pane mode) */}
+          {dualPane && (
+            <>
+              <div style={{ width: 1, background: T.border, flexShrink: 0 }} />
+              <div
+                onClick={() => setActivePane('right')}
+                style={{
+                  flex: 1, display: 'flex', overflow: 'auto', minWidth: 0,
+                  scrollSnapType: 'x mandatory', position: 'relative',
+                  outline: activePane === 'right' ? `2px solid ${A.c}44` : 'none',
+                  outlineOffset: -2,
+                }}>
+                <RightPaneColumns
+                  cascade={rightCascade} onNavigate={rightNavigateTo}
+                  nodeMap={nodeMap} registerEntries={registerEntries} {...colProps} />
+              </div>
+            </>
           )}
-
-          <SelectionBar count={totalMulti} accent={A} onClear={() => setMultiSel({})}
-            onAction={(a) => {
-              if (a === 'rename') setShowRename(true)
-              else if (a === 'delete') handleDelete()
-              else if (a === 'copy') {
-                const paths = flatMulti.map(i => i.path)
-                if (paths.length) { setClipboard({ paths, mode: 'copy' }); addToast(`${paths.length} items copied`) }
-              }
-            }}
-          />
         </div>
+
+        <SelectionBar count={totalMulti} accent={A} onClear={() => setMultiSel({})}
+          onAction={(a) => {
+            if (a === 'rename') setShowRename(true)
+            else if (a === 'delete') handleDelete()
+            else if (a === 'copy') {
+              const paths = flatMulti.map(i => i.path)
+              if (paths.length) { setClipboard({ paths, mode: 'copy' }); addToast(`${paths.length} items copied`) }
+            }
+          }}
+        />
       </div>
 
-      <CascadeStatusBar cascade={cascade} multiSel={multiSel} nodeMap={nodeMap} accent={A} />
+      <CascadeStatusBar cascade={cascade} multiSel={multiSel} nodeMap={nodeMap} accent={A} gitInfo={gitInfo} />
 
       {/* Clipboard indicator */}
       {clipboard && (
@@ -532,6 +639,15 @@ function CascadeExplorerInner({ homedir, accent: accentProp = 'blue' }) {
           items={buildContextItems(ctxMenu, { togglePin, setShowRename, setCtxMenu, handleDelete, tagMap, toggleTag, tagDefs })}
         />
       )}
+      {quickLookItem && (
+        <QuickLookModal
+          item={quickLookItem}
+          items={lastSelItems.filter(i => !i?.isDirectory)}
+          accent={A}
+          onClose={() => setQuickLookItem(null)}
+          onNavigate={setQuickLookItem}
+        />
+      )}
       {settingsOpen && (
         <SettingsModal
           onClose={() => setSettingsOpen(false)}
@@ -549,7 +665,83 @@ function CascadeExplorerInner({ homedir, accent: accentProp = 'blue' }) {
   )
 }
 
-function ColumnWithLoader({ dirPath, onEntries, quickFilters, showHidden, tagMap, tagDefs, activeTagFilter, onRename, onCopy, onMove, cutPaths, starredPaths, onToggleStar, ...colProps }) {
+function PaneColumns({ cascade, selectAt, onCtx, refreshKey, multiSel, colFilters, setColFilters, pinnedCols, onEntries, accent, tagMap, tagDefs, activeTagFilter, cutPaths, starredPaths, starFilter, gitInfo, onDelete, onRename, onCopy, onMove, onToggleStar, quickFilters, showHidden }) {
+  const lastPath = cascade[cascade.length - 1]
+  const columnPaths = cascade
+  return columnPaths.map((dirPath, depth) => (
+    <ColumnWithLoader
+      key={dirPath + refreshKey}
+      dirPath={dirPath}
+      selectedPath={cascade[depth + 1] || null}
+      multiSel={multiSel[depth + 1] || []}
+      filterText={colFilters[dirPath] || ''}
+      setFilter={(v) => setColFilters(prev => ({ ...prev, [dirPath]: v }))}
+      onSelect={(entry, e) => selectAt(depth + 1, entry, e)}
+      onContextMenu={(e, item) => onCtx(e, item, depth + 1)}
+      isPinned={pinnedCols.has(dirPath)}
+      onTogglePin={() => {}}
+      accent={accent}
+      onEntries={onEntries}
+      quickFilters={quickFilters}
+      showHidden={showHidden}
+      tagMap={tagMap}
+      tagDefs={tagDefs}
+      activeTagFilter={activeTagFilter}
+      onDelete={onDelete}
+      onRename={onRename}
+      onCopy={onCopy}
+      onMove={onMove}
+      cutPaths={cutPaths}
+      starredPaths={starredPaths}
+      onToggleStar={onToggleStar}
+      starFilter={starFilter}
+      gitStatuses={gitInfo?.fileStatuses}
+    />
+  ))
+}
+
+function RightPaneColumns({ cascade, onNavigate, nodeMap, registerEntries, refreshKey, multiSel, colFilters, setColFilters, pinnedCols, accent, tagMap, tagDefs, activeTagFilter, cutPaths, starredPaths, starFilter, gitInfo, onDelete, onRename, onCopy, onMove, onToggleStar, quickFilters, showHidden }) {
+  const [rightMultiSel, setRightMultiSel] = React.useState({})
+
+  const rightSelectAt = React.useCallback((depth, entry) => {
+    const newCascade = [...cascade.slice(0, depth), entry.path]
+    onNavigate(newCascade)
+    setRightMultiSel({ [depth]: [entry.path] })
+  }, [cascade, onNavigate])
+
+  return cascade.map((dirPath, depth) => (
+    <ColumnWithLoader
+      key={dirPath + refreshKey}
+      dirPath={dirPath}
+      selectedPath={cascade[depth + 1] || null}
+      multiSel={rightMultiSel[depth + 1] || []}
+      filterText={colFilters[dirPath] || ''}
+      setFilter={(v) => setColFilters(prev => ({ ...prev, [dirPath]: v }))}
+      onSelect={(entry) => rightSelectAt(depth + 1, entry)}
+      onContextMenu={() => {}}
+      isPinned={false}
+      onTogglePin={() => {}}
+      accent={accent}
+      onEntries={registerEntries}
+      quickFilters={quickFilters}
+      showHidden={showHidden}
+      tagMap={tagMap}
+      tagDefs={tagDefs}
+      activeTagFilter={activeTagFilter}
+      onDelete={onDelete}
+      onRename={onRename}
+      onCopy={onCopy}
+      onMove={onMove}
+      cutPaths={cutPaths}
+      starredPaths={starredPaths}
+      onToggleStar={onToggleStar}
+      starFilter={starFilter}
+      gitStatuses={gitInfo?.fileStatuses}
+    />
+  ))
+}
+
+function ColumnWithLoader({ dirPath, onEntries, quickFilters, showHidden, tagMap, tagDefs, activeTagFilter, onRename, onCopy, onMove, cutPaths, starredPaths, onToggleStar, gitStatuses, ...colProps }) {
   const { entries } = useDirectory(dirPath)
 
   React.useEffect(() => {
@@ -588,7 +780,7 @@ function ColumnWithLoader({ dirPath, onEntries, quickFilters, showHidden, tagMap
 
   return <CascadeColumn {...colProps} dirPath={dirPath} extraFilter={extraFilter} tagMap={tagMap} tagDefs={tagDefs}
     onRename={onRename} onCopy={onCopy} onMove={onMove} cutPaths={cutPaths}
-    starredPaths={starredPaths} onToggleStar={onToggleStar} />
+    starredPaths={starredPaths} onToggleStar={onToggleStar} gitStatuses={gitStatuses} />
 }
 
 function StackPreviewLoader({ parentPath, selectedPath, onSelect, onEntries }) {

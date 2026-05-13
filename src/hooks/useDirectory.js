@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 
 const getApi = () => window.electronAPI
 
-// Format file size from bytes to human-readable
 function formatSize(bytes) {
   if (!bytes || bytes === 0) return ''
   const units = ['B', 'KB', 'MB', 'GB', 'TB']
@@ -10,14 +9,12 @@ function formatSize(bytes) {
   return `${(bytes / Math.pow(1024, i)).toFixed(i > 0 ? 1 : 0)} ${units[i]}`
 }
 
-// Format date
 function formatDate(iso) {
   if (!iso) return ''
   const d = new Date(iso)
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-// Convert a raw filesystem entry to a UI-compatible node
 function entryToNode(entry) {
   return {
     id: entry.path,
@@ -30,16 +27,22 @@ function entryToNode(entry) {
     modified: formatDate(entry.modified),
     modifiedRaw: entry.modified,
     tags: [],
-    palette: undefined,
+    isArchiveEntry: entry.isArchiveEntry || false,
+    archivePath: entry.archivePath,
+    innerPath: entry.innerPath,
   }
 }
 
-// Cache for directory listings to avoid redundant reads
 const dirCache = new Map()
 
 export function clearDirCache(dirPath) {
   if (dirPath) dirCache.delete(dirPath)
   else dirCache.clear()
+}
+
+// Returns true if a path is a virtual archive path (e.g. "/foo/bar.zip::subdir")
+export function isArchivePath(p) {
+  return p && p.includes('::')
 }
 
 export function useDirectory(dirPath) {
@@ -60,17 +63,18 @@ export function useDirectory(dirPath) {
     setLoading(true)
     setError(null)
     try {
-      const result = await api.readDir(dirPath)
-      if (result?.error) {
-        setError(result.error)
-        setEntries([])
-        return
+      let result
+      if (isArchivePath(dirPath)) {
+        // Virtual archive path: "/path/to/file.zip::inner/dir"
+        const [archivePath, innerDir] = dirPath.split('::')
+        result = await api.readArchive(archivePath, innerDir || '')
+      } else {
+        result = await api.readDir(dirPath)
       }
+      if (result?.error) { setError(result.error); setEntries([]); return }
       const nodes = result.map(entryToNode)
       dirCache.set(dirPath, nodes)
-      if (pathRef.current === dirPath) {
-        setEntries(nodes)
-      }
+      if (pathRef.current === dirPath) setEntries(nodes)
     } catch (e) {
       setError(e.message)
     } finally {
@@ -80,12 +84,42 @@ export function useDirectory(dirPath) {
 
   useEffect(() => { load() }, [load])
 
-  const refresh = useCallback(() => {
-    dirCache.delete(dirPath)
-    load(true)
+  // Live folder watching — only for real directories (not archives)
+  useEffect(() => {
+    const api = getApi()
+    if (!api || !dirPath || isArchivePath(dirPath)) return
+    api.watchDir(dirPath)
+    const unsubscribe = api.onDirChanged((changedPath) => {
+      if (changedPath === dirPath) {
+        dirCache.delete(dirPath)
+        if (pathRef.current === dirPath) load(true)
+      }
+    })
+    return () => { api.unwatchDir(dirPath); unsubscribe?.() }
   }, [dirPath, load])
 
+  const refresh = useCallback(() => { dirCache.delete(dirPath); load(true) }, [dirPath, load])
+
   return { entries, loading, error, refresh }
+}
+
+export function useGitStatus(dirPath) {
+  const [gitInfo, setGitInfo] = useState(null)
+  const timerRef = useRef(null)
+
+  useEffect(() => {
+    if (!dirPath || isArchivePath(dirPath)) { setGitInfo(null); return }
+    const api = getApi()
+    if (!api?.gitStatus) return
+    // Debounce to avoid spamming on rapid navigation
+    clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(() => {
+      api.gitStatus(dirPath).then(info => setGitInfo(info || null))
+    }, 300)
+    return () => clearTimeout(timerRef.current)
+  }, [dirPath])
+
+  return gitInfo
 }
 
 export function useHomedir() {
@@ -106,13 +140,11 @@ export function useRoots() {
   return roots
 }
 
-// Build sidebar quick-access sections from the home directory
 export function useSidebarSections(homedir) {
   const [sections, setSections] = useState([])
 
   useEffect(() => {
     if (!homedir) return
-
     const places = [
       { name: 'Home', path: homedir, kind: 'folder' },
       { name: 'Desktop', path: `${homedir}/Desktop`, kind: 'folder' },
@@ -122,22 +154,14 @@ export function useSidebarSections(homedir) {
       { name: 'Music', path: `${homedir}/Music`, kind: 'folder' },
       { name: 'Videos', path: `${homedir}/Videos`, kind: 'folder' },
     ]
-
-    // Filter to only existing paths
     const api = getApi()
     if (!api) return
-    Promise.all(
-      places.map(async (p) => {
-        try {
-          const stat = await api.stat(p.path)
-          return stat?.error ? null : { ...p, id: p.path }
-        } catch {
-          return null
-        }
-      })
-    ).then((results) => {
-      setSections(results.filter(Boolean))
-    })
+    Promise.all(places.map(async (p) => {
+      try {
+        const stat = await api.stat(p.path)
+        return stat?.error ? null : { ...p, id: p.path }
+      } catch { return null }
+    })).then(results => setSections(results.filter(Boolean)))
   }, [homedir])
 
   return sections

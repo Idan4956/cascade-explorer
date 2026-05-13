@@ -2,7 +2,7 @@ import React from 'react'
 import { IconBack, IconForward, IconSearch, IconSettings, FileTile, IconClock } from './icons'
 import { useTheme } from '../contexts/ThemeContext'
 
-export default function CascadeHeader({ cascade, nodeMap, setCascade, openPalette, history, canGoBack, canGoForward, onGoBack, onGoForward, stackMode, setStackMode, accent, onOpenSettings }) {
+export default function CascadeHeader({ cascade, nodeMap, setCascade, openPalette, history, canGoBack, canGoForward, onGoBack, onGoForward, stackMode, setStackMode, accent, onOpenSettings, dualPane, onToggleDualPane }) {
   const { T } = useTheme()
   const [dragOverIdx, setDragOverIdx] = React.useState(null)
 
@@ -64,6 +64,26 @@ export default function CascadeHeader({ cascade, nodeMap, setCascade, openPalett
 
         {/* Right: action buttons */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '0 8px', WebkitAppRegion: 'no-drag' }}>
+          {/* Dual pane toggle */}
+          {onToggleDualPane && (
+            <button
+              onClick={onToggleDualPane}
+              title="Dual pane (split view)"
+              style={{
+                height: 28, padding: '0 10px',
+                background: dualPane ? accent.soft : 'transparent',
+                color: dualPane ? accent.c : T.textMid,
+                border: `1px solid ${dualPane ? accent.c + '44' : T.borderMid}`,
+                borderRadius: 4, fontSize: 11.5, fontWeight: dualPane ? 600 : 400,
+                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
+              }}>
+              <svg width="13" height="12" viewBox="0 0 26 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <rect x="1" y="2" width="10" height="20" rx="1"/><rect x="15" y="2" width="10" height="20" rx="1"/>
+              </svg>
+              Split
+            </button>
+          )}
+
           {/* Stack toggle */}
           <button
             onClick={() => setStackMode(!stackMode)}

@@ -21,6 +21,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   toggleStar: (filePath) => ipcRenderer.invoke('starred:toggle', filePath),
   getVersion: () => ipcRenderer.invoke('app:getVersion'),
   checkUpdate: () => ipcRenderer.invoke('app:checkUpdate'),
+  watchDir: (dirPath) => ipcRenderer.invoke('fs:watch', dirPath),
+  unwatchDir: (dirPath) => ipcRenderer.invoke('fs:unwatch', dirPath),
+  onDirChanged: (cb) => {
+    ipcRenderer.on('fs:changed', (_, dirPath) => cb(dirPath))
+    return () => ipcRenderer.removeAllListeners('fs:changed')
+  },
+  gitStatus: (dirPath) => ipcRenderer.invoke('git:status', dirPath),
+  readArchive: (archivePath, innerDir) => ipcRenderer.invoke('fs:readArchive', archivePath, innerDir),
+  openTerminal: (dirPath) => ipcRenderer.invoke('app:openTerminal', dirPath),
   homedir: () => ipcRenderer.invoke('fs:homedir'),
   roots: () => ipcRenderer.invoke('fs:roots'),
   diskUsage: () => ipcRenderer.invoke('fs:diskUsage'),

@@ -4,6 +4,12 @@ import fs from 'fs'
 import https from 'https'
 import os from 'os'
 import path from 'path'
+import { exec } from 'child_process'
+import { promisify } from 'util'
+import AdmZip from 'adm-zip'
+
+const execAsync = promisify(exec)
+let mainWin = null
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
 
@@ -110,6 +116,7 @@ function createWindow() {
 
   win.on('maximize', () => win.webContents.send('window:maximized', true))
   win.on('unmaximize', () => win.webContents.send('window:maximized', false))
+  mainWin = win
 }
 
 app.whenReady().then(() => {
@@ -336,6 +343,111 @@ ipcMain.handle('fs:roots', () => {
     return drives
   }
   return ['/']
+})
+
+// ── Live folder watching ──────────────────────────────────────────────────────
+const watchers = new Map()
+
+ipcMain.handle('fs:watch', (_, dirPath) => {
+  if (watchers.has(dirPath)) return { ok: true }
+  try {
+    let timer = null
+    const watcher = fs.watch(dirPath, { persistent: false }, () => {
+      clearTimeout(timer)
+      timer = setTimeout(() => {
+        if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.send('fs:changed', dirPath)
+      }, 200)
+    })
+    watcher.on('error', () => watchers.delete(dirPath))
+    watchers.set(dirPath, { watcher, get timer() { return timer }, set timer(v) { timer = v } })
+  } catch {}
+  return { ok: true }
+})
+
+ipcMain.handle('fs:unwatch', (_, dirPath) => {
+  const entry = watchers.get(dirPath)
+  if (entry) { clearTimeout(entry.timer); entry.watcher.close(); watchers.delete(dirPath) }
+  return { ok: true }
+})
+
+// ── Git integration ───────────────────────────────────────────────────────────
+ipcMain.handle('git:status', async (_, dirPath) => {
+  try {
+    const { stdout: rootRaw } = await execAsync('git rev-parse --show-toplevel', { cwd: dirPath })
+    const gitRoot = rootRaw.trim().replace(/\//g, path.sep)
+    const [{ stdout: branchRaw }, { stdout: statusRaw }] = await Promise.all([
+      execAsync('git rev-parse --abbrev-ref HEAD', { cwd: dirPath }),
+      execAsync('git status --porcelain -u', { cwd: dirPath }),
+    ])
+    const branch = branchRaw.trim()
+    const fileStatuses = {}
+    for (const line of statusRaw.split('\n')) {
+      if (!line.trim()) continue
+      const x = line[0], y = line[1]
+      const file = line.slice(3).trim().replace(/"/g, '').split(' -> ').pop()
+      const full = path.join(gitRoot, file)
+      if (x === '?' && y === '?') fileStatuses[full] = 'untracked'
+      else if (x !== ' ' && x !== '?') fileStatuses[full] = 'staged'
+      else fileStatuses[full] = 'modified'
+    }
+    return { gitRoot, branch, fileStatuses }
+  } catch { return null }
+})
+
+// ── Archive browsing (ZIP) ────────────────────────────────────────────────────
+ipcMain.handle('fs:readArchive', (_, archivePath, innerDir = '') => {
+  try {
+    const zip = new AdmZip(archivePath)
+    const entries = zip.getEntries()
+    const prefix = innerDir ? innerDir.replace(/\\/g, '/').replace(/\/?$/, '/') : ''
+    const seen = new Set()
+    const results = []
+    for (const entry of entries) {
+      const name = entry.entryName.replace(/\\/g, '/')
+      if (!name.startsWith(prefix)) continue
+      const rest = name.slice(prefix.length)
+      if (!rest || rest === '/') continue
+      const parts = rest.split('/')
+      const topName = parts[0]
+      if (!topName || seen.has(topName)) continue
+      seen.add(topName)
+      const isDir = parts.length > 1 || entry.isDirectory
+      const virtualPath = archivePath + '::' + (prefix + topName)
+      results.push({
+        name: topName,
+        path: virtualPath,
+        isDirectory: isDir,
+        size: isDir ? 0 : entry.header.size,
+        modified: entry.header.time?.toISOString() || null,
+        kind: isDir ? 'folder' : getKind(topName, false),
+        isArchiveEntry: true,
+        archivePath,
+        innerPath: prefix + topName,
+      })
+    }
+    return results.sort((a, b) => {
+      if (a.isDirectory !== b.isDirectory) return a.isDirectory ? -1 : 1
+      return a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+    })
+  } catch (err) { return { error: err.message } }
+})
+
+// ── Open in Terminal ──────────────────────────────────────────────────────────
+ipcMain.handle('app:openTerminal', (_, dirPath) => {
+  const p = process.platform
+  if (p === 'win32') {
+    exec(`start wt.exe -d "${dirPath}"`, { shell: true }, (err) => {
+      if (err) exec(`start cmd /K "cd /d \\"${dirPath}\\""`, { shell: true })
+    })
+  } else if (p === 'darwin') {
+    exec(`open -a Terminal "${dirPath}"`)
+  } else {
+    const terms = ['gnome-terminal --working-directory', 'xterm -e "cd', 'konsole --workdir']
+    exec(`${terms[0]} "${dirPath}"`, (err) => {
+      if (err) exec(`xterm -e "cd '${dirPath}' && $SHELL"`)
+    })
+  }
+  return { ok: true }
 })
 
 // ── Helpers ────────────────────────────────────────────────────────────────

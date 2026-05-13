@@ -24,6 +24,7 @@ export default function CascadeColumn({
   cutPaths,
   starredPaths,
   onToggleStar,
+  gitStatuses,
 }) {
   const { T } = useTheme()
   const { entries, loading, error, refresh } = useDirectory(dirPath)
@@ -250,6 +251,7 @@ export default function CascadeColumn({
           const isDragTarget = dragOverPath === item.path && item.isDirectory
           const isCut = cutPaths?.has(item.path)
           const isStarred = starredPaths?.has(item.path)
+          const gitStatus = gitStatuses?.[item.path]
           const isKb = kbIdx === idx
 
           const rowBg = isDragTarget
@@ -310,6 +312,12 @@ export default function CascadeColumn({
                   <svg width="9" height="9" viewBox="0 0 24 24" fill="#f5a623" stroke="#f5a623" strokeWidth="1" style={{ flex: 'none' }}>
                     <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
                   </svg>
+                )}
+                {!isRenaming && gitStatus && (
+                  <div title={gitStatus} style={{
+                    width: 6, height: 6, borderRadius: 99, flex: 'none',
+                    background: gitStatus === 'staged' ? '#3fa45a' : gitStatus === 'untracked' ? '#0067c0' : '#e8a020',
+                  }} />
                 )}
                 {!isRenaming && item.isDirectory && (
                   <IconChevronRight size={11} color={isSel && !isMulti ? 'rgba(255,255,255,0.85)' : T.textFaint} />
