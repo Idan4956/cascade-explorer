@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, shell, dialog } from 'electron'
 import { join } from 'path'
 import fs from 'fs'
+import https from 'https'
 import os from 'os'
 import path from 'path'
 
@@ -33,6 +34,46 @@ ipcMain.handle('tags:setDefs', (_, defs) => {
   try { fs.writeFileSync(tagDefsPath(), JSON.stringify(defs, null, 2)) } catch {}
   return { ok: true }
 })
+
+// ── Starred persistence ───────────────────────────────────────────────────────
+let starredCache = new Set()
+const starredPath = () => path.join(app.getPath('userData'), 'starred.json')
+
+function loadStarred() {
+  try { starredCache = new Set(JSON.parse(fs.readFileSync(starredPath(), 'utf-8'))) } catch { starredCache = new Set() }
+}
+function saveStarred() {
+  try { fs.writeFileSync(starredPath(), JSON.stringify([...starredCache])) } catch {}
+}
+
+ipcMain.handle('starred:getAll', () => [...starredCache])
+ipcMain.handle('starred:toggle', (_, filePath) => {
+  if (starredCache.has(filePath)) starredCache.delete(filePath)
+  else starredCache.add(filePath)
+  saveStarred()
+  return [...starredCache]
+})
+
+// ── App version & update check ───────────────────────────────────────────────
+ipcMain.handle('app:getVersion', () => app.getVersion())
+ipcMain.handle('app:checkUpdate', () => new Promise((resolve) => {
+  const req = https.request({
+    hostname: 'api.github.com',
+    path: '/repos/Idan4956/cascade-explorer/releases/latest',
+    headers: { 'User-Agent': 'Cascade-App' },
+  }, (res) => {
+    let data = ''
+    res.on('data', chunk => { data += chunk })
+    res.on('end', () => {
+      try {
+        const json = JSON.parse(data)
+        resolve({ version: json.tag_name, url: json.html_url })
+      } catch { resolve({ error: 'Parse error' }) }
+    })
+  })
+  req.on('error', (e) => resolve({ error: e.message }))
+  req.end()
+}))
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -73,6 +114,7 @@ function createWindow() {
 
 app.whenReady().then(() => {
   loadTags()
+  loadStarred()
   createWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

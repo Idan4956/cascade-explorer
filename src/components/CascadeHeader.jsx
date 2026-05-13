@@ -98,13 +98,13 @@ export default function CascadeHeader({ cascade, nodeMap, setCascade, openPalett
             }}>
             <IconSearch size={12} color={T.textSub} />
             <span style={{ flex: 1, textAlign: 'left' }}>Search files, commands…</span>
-            <kbd style={{ fontSize: 10, padding: '1px 5px', background: T.hoverBg, borderRadius: 3, color: T.textDim, border: `1px solid ${T.border}` }}>⌘K</kbd>
+            <kbd style={{ fontSize: 10, padding: '1px 5px', background: T.hoverBg, borderRadius: 3, color: T.textDim, border: `1px solid ${T.border}` }}>Ctrl+K</kbd>
           </button>
 
           {/* Settings button */}
           <button
             onClick={onOpenSettings}
-            title="Settings (⌘,)"
+            title="Settings (Ctrl+,)"
             style={{
               width: 28, height: 28, border: 'none',
               background: 'transparent', borderRadius: 4,

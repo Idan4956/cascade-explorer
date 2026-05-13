@@ -16,6 +16,7 @@ const HUE_PRESETS = [15, 45, 80, 145, 185, 235, 290, 330]
 export default function CascadeSidebar({
   cascade, homedir, places, drives = [], onJump, accent, setShowShortcuts, onSmartFolder,
   tagDefs = [], activeTagFilter, onTagFilter, onAddTag, onDeleteTag,
+  starFilter, onToggleStarFilter, starredCount = 0,
 }) {
   const { T } = useTheme()
   const activePath = cascade[cascade.length - 1]
@@ -39,7 +40,7 @@ export default function CascadeSidebar({
       items: [
         { id: 'home', name: 'Home', icon: <IconHome size={13} />, path: homedir ? [homedir] : null },
         { id: 'recent', name: 'Recent', icon: <IconClock size={13} />, path: null, smartFolder: SMART_FOLDERS[0] },
-        { id: 'starred', name: 'Starred (coming soon)', icon: <IconStar size={13} />, path: null },
+        { id: 'starred', name: 'Starred', icon: <IconStar size={13} />, path: null, onActivate: onToggleStarFilter, isStarFilter: true },
       ],
     },
     {
@@ -96,10 +97,11 @@ export default function CascadeSidebar({
             {sec.title}
           </div>
           {sec.items.map(it => {
-            const active = activePath === it.id || activePath === it.path?.[0] || (it.path?.[0] && activePath?.startsWith(it.path[0]))
-            const clickable = it.path || it.smartFolder
+            const active = (it.isStarFilter ? starFilter : false) || activePath === it.id || activePath === it.path?.[0] || (it.path?.[0] && activePath?.startsWith(it.path[0]))
+            const clickable = it.path || it.smartFolder || it.onActivate
             const handleClick = () => {
-              if (it.smartFolder) { onSmartFolder(it.smartFolder); if (homedir) onJump([homedir]) }
+              if (it.onActivate) { it.onActivate() }
+              else if (it.smartFolder) { onSmartFolder(it.smartFolder); if (homedir) onJump([homedir]) }
               else if (it.path) onJump(it.path)
             }
             return (
@@ -116,6 +118,9 @@ export default function CascadeSidebar({
                 onMouseLeave={(e) => !active && (e.currentTarget.style.background = 'transparent')}>
                 {it.icon}
                 <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.name}</span>
+                {it.isStarFilter && starredCount > 0 && (
+                  <span style={{ fontSize: 10, color: active ? accent.c : T.textFaint, background: active ? accent.soft : T.hoverBg, borderRadius: 99, padding: '1px 5px', fontWeight: 600 }}>{starredCount}</span>
+                )}
               </button>
             )
           })}
@@ -208,7 +213,7 @@ export default function CascadeSidebar({
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
         }}>
           <IconCommand size={11} color={T.textSub} /> Shortcuts
-          <kbd style={{ fontSize: 9, padding: '1px 4px', background: T.hoverBg, borderRadius: 3, color: T.textDim }}>⌘/</kbd>
+          <kbd style={{ fontSize: 9, padding: '1px 4px', background: T.hoverBg, borderRadius: 3, color: T.textDim }}>Ctrl+/</kbd>
         </button>
       </div>
     </div>

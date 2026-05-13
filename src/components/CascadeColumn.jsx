@@ -22,6 +22,8 @@ export default function CascadeColumn({
   onCopy,
   onMove,
   cutPaths,
+  starredPaths,
+  onToggleStar,
 }) {
   const { T } = useTheme()
   const { entries, loading, error, refresh } = useDirectory(dirPath)
@@ -247,6 +249,7 @@ export default function CascadeColumn({
           const isRenaming = renamingPath === item.path
           const isDragTarget = dragOverPath === item.path && item.isDirectory
           const isCut = cutPaths?.has(item.path)
+          const isStarred = starredPaths?.has(item.path)
           const isKb = kbIdx === idx
 
           const rowBg = isDragTarget
@@ -280,7 +283,7 @@ export default function CascadeColumn({
                 }}
                 style={{
                   width: '100%', display: 'flex', alignItems: 'center', gap: 9,
-                  padding: '6px 10px', paddingRight: isHovered ? 72 : 10,
+                  padding: '6px 10px', paddingRight: isHovered ? 96 : 10,
                   borderRadius: 4, border: 'none',
                   background: rowBg,
                   color: isSel && !isMulti ? '#fff' : T.text,
@@ -303,6 +306,11 @@ export default function CascadeColumn({
                   const tag = tagDefs.find(x => x.id === t)
                   return tag && <div key={t} style={{ width: 6, height: 6, borderRadius: 99, background: `oklch(0.62 0.16 ${tag.hue})`, flex: 'none' }} />
                 })}
+                {!isRenaming && isStarred && (
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="#f5a623" stroke="#f5a623" strokeWidth="1" style={{ flex: 'none' }}>
+                    <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
+                  </svg>
+                )}
                 {!isRenaming && item.isDirectory && (
                   <IconChevronRight size={11} color={isSel && !isMulti ? 'rgba(255,255,255,0.85)' : T.textFaint} />
                 )}
@@ -310,6 +318,13 @@ export default function CascadeColumn({
 
               {isHovered && !isRenaming && (
                 <>
+                  {onToggleStar && (
+                    <HoverBtn right={74} title={isStarred ? 'Unstar' : 'Star'} onClick={(e) => { e.stopPropagation(); onToggleStar(item.path) }} hoverColor="rgba(245,166,35,0.15)" hoverIconColor="#f5a623">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill={isStarred ? '#f5a623' : 'none'} stroke={isStarred ? '#f5a623' : 'currentColor'} strokeWidth="2">
+                        <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
+                      </svg>
+                    </HoverBtn>
+                  )}
                   {onRename && <HoverBtn right={52} title="Rename" onClick={(e) => startRename(item, e)} hoverColor="rgba(111,76,179,0.15)" hoverIconColor="#9d7ce0"><IconRename size={11} /></HoverBtn>}
                   {onCopy && <HoverBtn right={30} title="Duplicate" onClick={(e) => { e.stopPropagation(); onCopy(item) }} hoverColor="rgba(0,131,143,0.12)" hoverIconColor="#00838f"><IconCopy size={11} /></HoverBtn>}
                   {onDelete && <HoverBtn right={6} title="Move to Trash" onClick={(e) => { e.stopPropagation(); onDelete(item) }} hoverColor="rgba(220,50,50,0.12)" hoverIconColor="#e53e3e"><IconTrash size={12} /></HoverBtn>}

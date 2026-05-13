@@ -73,6 +73,8 @@ function CascadeExplorerInner({ homedir, accent: accentProp = 'blue' }) {
   const [tagMap, setTagMap] = React.useState({})
   const [tagDefs, setTagDefs] = React.useState(DEFAULT_TAGS)
   const [activeTagFilter, setActiveTagFilter] = React.useState(null)
+  const [starredPaths, setStarredPaths] = React.useState(new Set())
+  const [starFilter, setStarFilter] = React.useState(false)
 
   // ── Clipboard: { paths: string[], mode: 'copy'|'cut' } ───────
   const [clipboard, setClipboard] = React.useState(null)
@@ -94,6 +96,21 @@ function CascadeExplorerInner({ homedir, accent: accentProp = 'blue' }) {
     if (!api) return
     api.getAllTags().then(t => setTagMap(t || {}))
     api.getTagDefs().then(d => { if (d) setTagDefs(d) })
+    api.getStarred().then(paths => { if (paths) setStarredPaths(new Set(paths)) })
+  }, [])
+
+  const toggleStar = React.useCallback(async (filePath) => {
+    const api = window.electronAPI
+    if (api) {
+      const result = await api.toggleStar(filePath)
+      if (result) setStarredPaths(new Set(result))
+    } else {
+      setStarredPaths(prev => {
+        const next = new Set(prev)
+        next.has(filePath) ? next.delete(filePath) : next.add(filePath)
+        return next
+      })
+    }
   }, [])
 
   const saveTagDefs = React.useCallback((defs) => {
@@ -406,6 +423,8 @@ function CascadeExplorerInner({ homedir, accent: accentProp = 'blue' }) {
           tagDefs={tagDefs} activeTagFilter={activeTagFilter}
           onTagFilter={(id) => setActiveTagFilter(prev => prev === id ? null : id)}
           onAddTag={addTag} onDeleteTag={deleteTag}
+          starFilter={starFilter} onToggleStarFilter={() => setStarFilter(v => !v)}
+          starredCount={starredPaths.size}
         />
 
         <div style={{ flex: 1, display: 'flex', overflow: 'auto', minWidth: 0, scrollSnapType: 'x mandatory', position: 'relative' }}>
@@ -433,6 +452,9 @@ function CascadeExplorerInner({ homedir, accent: accentProp = 'blue' }) {
               onCopy={copyItem}
               onMove={moveItem}
               cutPaths={cutPaths}
+              starredPaths={starredPaths}
+              onToggleStar={toggleStar}
+              starFilter={starFilter}
             />
           ))}
 
@@ -474,7 +496,7 @@ function CascadeExplorerInner({ homedir, accent: accentProp = 'blue' }) {
         }}>
           <span style={{ color: A.c, fontWeight: 600 }}>{clipboard.mode === 'cut' ? '✂️' : '📋'}</span>
           {clipboard.paths.length} item{clipboard.paths.length > 1 ? 's' : ''} ready to {clipboard.mode === 'cut' ? 'move' : 'paste'}
-          <kbd style={{ fontSize: 9.5, padding: '1px 5px', background: `${A.c}22`, borderRadius: 3, color: A.c }}>⌘V</kbd>
+          <kbd style={{ fontSize: 9.5, padding: '1px 5px', background: `${A.c}22`, borderRadius: 3, color: A.c }}>Ctrl+V</kbd>
         </div>
       )}
 
@@ -527,7 +549,7 @@ function CascadeExplorerInner({ homedir, accent: accentProp = 'blue' }) {
   )
 }
 
-function ColumnWithLoader({ dirPath, onEntries, quickFilters, showHidden, tagMap, tagDefs, activeTagFilter, onRename, onCopy, onMove, cutPaths, ...colProps }) {
+function ColumnWithLoader({ dirPath, onEntries, quickFilters, showHidden, tagMap, tagDefs, activeTagFilter, onRename, onCopy, onMove, cutPaths, starredPaths, onToggleStar, ...colProps }) {
   const { entries } = useDirectory(dirPath)
 
   React.useEffect(() => {
@@ -542,7 +564,9 @@ function ColumnWithLoader({ dirPath, onEntries, quickFilters, showHidden, tagMap
     const hasWeek = !!quickFilters['date:week']
     const hideHidden = !showHidden
 
-    if (!hasKind && !hasSizeBig && !hasToday && !hasWeek && !hideHidden && !activeTagFilter) return null
+    const hasStarFilter = !!colProps.starFilter
+
+    if (!hasKind && !hasSizeBig && !hasToday && !hasWeek && !hideHidden && !activeTagFilter && !hasStarFilter) return null
 
     return (e) => {
       if (hideHidden && e.name.startsWith('.')) return false
@@ -557,12 +581,14 @@ function ColumnWithLoader({ dirPath, onEntries, quickFilters, showHidden, tagMap
         if (mod < Date.now() - 7 * 24 * 60 * 60 * 1000) return false
       }
       if (activeTagFilter && !(tagMap?.[e.path] || []).includes(activeTagFilter)) return false
+      if (hasStarFilter && !starredPaths?.has(e.path)) return false
       return true
     }
-  }, [quickFilters, showHidden, activeTagFilter, tagMap])
+  }, [quickFilters, showHidden, activeTagFilter, tagMap, colProps.starFilter, starredPaths])
 
   return <CascadeColumn {...colProps} dirPath={dirPath} extraFilter={extraFilter} tagMap={tagMap} tagDefs={tagDefs}
-    onRename={onRename} onCopy={onCopy} onMove={onMove} cutPaths={cutPaths} />
+    onRename={onRename} onCopy={onCopy} onMove={onMove} cutPaths={cutPaths}
+    starredPaths={starredPaths} onToggleStar={onToggleStar} />
 }
 
 function StackPreviewLoader({ parentPath, selectedPath, onSelect, onEntries }) {
@@ -589,7 +615,7 @@ function buildContextItems(ctxMenu, { togglePin, setShowRename, setCtxMenu, hand
       }
     })},
     { divider: true },
-    { icon: <IconInfo size={12} />, label: 'Properties', kbd: '⌘I' },
+    { icon: <IconInfo size={12} />, label: 'Properties', kbd: 'Alt+Enter' },
     { divider: true },
     { icon: <IconTrash size={12} />, label: 'Move to Trash', kbd: '⌫', danger: true, onClick: () => { handleDelete(); setCtxMenu(null) } },
   ]

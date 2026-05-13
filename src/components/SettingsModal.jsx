@@ -123,13 +123,13 @@ export default function SettingsModal({
           {/* ── Keyboard shortcuts reference ───────────── */}
           <Section label="Keyboard shortcuts" T={T}>
             {[
-              ['Command palette', '⌘ K'],
-              ['Settings',        '⌘ ,'],
-              ['Copy',            '⌘ C'],
-              ['Cut',             '⌘ X'],
-              ['Paste',           '⌘ V'],
+              ['Command palette', 'Ctrl+K'],
+              ['Settings',        'Ctrl+,'],
+              ['Copy',            'Ctrl+C'],
+              ['Cut',             'Ctrl+X'],
+              ['Paste',           'Ctrl+V'],
               ['Rename',          'F2'],
-              ['Go back',         '⌥ ⌫'],
+              ['Go back',         'Alt+←'],
               ['Navigate items',  '↑ ↓ → ↵'],
             ].map(([action, kbd]) => (
               <div key={action} style={{
@@ -146,6 +146,11 @@ export default function SettingsModal({
                 }}>{kbd}</kbd>
               </div>
             ))}
+          </Section>
+
+          {/* ── Updates ───────────────────────────────── */}
+          <Section label="Updates" T={T}>
+            <UpdateChecker T={T} accentColor={accentColor} />
           </Section>
 
           {/* ── About ─────────────────────────────────── */}
@@ -227,6 +232,63 @@ function ThemeChip({ label, active, onClick, T, accentColor }) {
       }}>
       {label}
     </button>
+  )
+}
+
+function UpdateChecker({ T, accentColor }) {
+  const [status, setStatus] = React.useState('idle')
+  const [latest, setLatest] = React.useState(null)
+  const [downloadUrl, setDownloadUrl] = React.useState(null)
+  const [current, setCurrent] = React.useState('1.0.0')
+
+  React.useEffect(() => {
+    window.electronAPI?.getVersion().then(v => { if (v) setCurrent(v) })
+  }, [])
+
+  const check = async () => {
+    setStatus('checking')
+    const result = await window.electronAPI?.checkUpdate()
+    if (!result || result.error) { setStatus('error'); return }
+    const v = result.version?.replace(/^v/, '')
+    setLatest(v)
+    setDownloadUrl(result.url)
+    setStatus(v === current ? 'up-to-date' : 'available')
+  }
+
+  return (
+    <div style={{ padding: '12px 20px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, color: T.text, fontWeight: 500 }}>Current version: {current}</div>
+          {status === 'available' && <div style={{ fontSize: 12, color: accentColor, marginTop: 3, fontWeight: 500 }}>Version {latest} is available</div>}
+          {status === 'up-to-date' && <div style={{ fontSize: 12, color: '#3fa45a', marginTop: 3 }}>You're up to date</div>}
+          {status === 'error' && <div style={{ fontSize: 12, color: '#c83a2e', marginTop: 3 }}>Couldn't check for updates</div>}
+        </div>
+        <button
+          onClick={check}
+          disabled={status === 'checking'}
+          style={{
+            height: 28, padding: '0 14px',
+            background: accentColor, color: '#fff',
+            border: 'none', borderRadius: 4,
+            fontSize: 12, fontWeight: 500,
+            cursor: status === 'checking' ? 'default' : 'pointer',
+            opacity: status === 'checking' ? 0.7 : 1,
+            flexShrink: 0,
+          }}>
+          {status === 'checking' ? 'Checking…' : 'Check for updates'}
+        </button>
+      </div>
+      {status === 'available' && downloadUrl && (
+        <a
+          href={downloadUrl}
+          target="_blank"
+          rel="noreferrer"
+          style={{ fontSize: 12, color: accentColor, textDecoration: 'none', fontWeight: 500, display: 'inline-block', marginTop: 8 }}>
+          Download latest release ↗
+        </a>
+      )}
+    </div>
   )
 }
 
