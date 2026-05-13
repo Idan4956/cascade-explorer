@@ -161,7 +161,7 @@ export default function CascadeColumn({
             <div style={{
               position: 'absolute', top: 22, right: 0, zIndex: 100,
               background: T.modalBg, border: `1px solid ${T.borderMid}`,
-              borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
+              borderRadius: 6, boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
               overflow: 'hidden', minWidth: 130,
             }}>
               {[['folder','📁','New Folder'],['file','📄','New File']].map(([type, icon, label]) => (
@@ -281,7 +281,7 @@ export default function CascadeColumn({
                 style={{
                   width: '100%', display: 'flex', alignItems: 'center', gap: 9,
                   padding: '6px 10px', paddingRight: isHovered ? 72 : 10,
-                  borderRadius: 5, border: 'none',
+                  borderRadius: 4, border: 'none',
                   background: rowBg,
                   color: isSel && !isMulti ? '#fff' : T.text,
                   cursor: 'pointer', fontSize: 12, textAlign: 'left', flex: 1,

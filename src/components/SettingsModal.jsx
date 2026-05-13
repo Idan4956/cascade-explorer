@@ -36,7 +36,7 @@ export default function SettingsModal({
         onClick={e => e.stopPropagation()}
         style={{
           width: 500, maxHeight: '80vh',
-          background: T.modalBg, borderRadius: 14,
+          background: T.modalBg, borderRadius: 8,
           border: `1px solid ${T.borderMid}`,
           boxShadow: '0 32px 80px rgba(0,0,0,0.32), 0 8px 20px rgba(0,0,0,0.12)',
           overflow: 'hidden', display: 'flex', flexDirection: 'column',
@@ -219,7 +219,7 @@ function ThemeChip({ label, active, onClick, T, accentColor }) {
       style={{
         height: 28, padding: '0 13px',
         border: `1px solid ${active ? 'transparent' : T.borderMid}`,
-        borderRadius: 7, fontSize: 12, cursor: 'pointer',
+        borderRadius: 4, fontSize: 12, cursor: 'pointer',
         fontWeight: active ? 600 : 400,
         background: active ? accentColor : 'transparent',
         color: active ? '#fff' : T.textMid,

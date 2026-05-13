@@ -104,7 +104,7 @@ export default function CascadeSidebar({
             }
             return (
               <button key={it.id} onClick={handleClick} style={{
-                display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 6,
+                display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 4,
                 border: 'none', background: active ? accent.soft : 'transparent',
                 fontSize: 12, cursor: clickable ? 'pointer' : 'default',
                 color: active ? accent.c : T.text,
@@ -174,7 +174,7 @@ export default function CascadeSidebar({
               style={{ display: 'flex', alignItems: 'center', borderRadius: 6 }}>
               <button onClick={() => onTagFilter?.(t.id)} style={{
                 flex: 1, display: 'flex', alignItems: 'center', gap: 8,
-                padding: '6px 10px', borderRadius: 6, border: 'none',
+                padding: '6px 10px', borderRadius: 4, border: 'none',
                 background: isActive ? `oklch(0.94 0.05 ${t.hue})` : (isHovered ? T.hoverBg : 'transparent'),
                 color: isActive ? `oklch(0.32 0.14 ${t.hue})` : T.text,
                 fontWeight: isActive ? 600 : 400,
@@ -204,7 +204,7 @@ export default function CascadeSidebar({
         <button onClick={() => setShowShortcuts(true)} style={{
           marginTop: 10, width: '100%', height: 26,
           border: `1px solid ${T.borderMid}`, background: 'transparent',
-          borderRadius: 6, fontSize: 11, color: T.textSub, cursor: 'pointer',
+          borderRadius: 4, fontSize: 11, color: T.textSub, cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
         }}>
           <IconCommand size={11} color={T.textSub} /> Shortcuts

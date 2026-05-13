@@ -34,7 +34,7 @@ const saveSetting = (key, val) => {
   try { localStorage.setItem(`cascade-${key}`, JSON.stringify(val)) } catch {}
 }
 
-function CascadeExplorerInner({ homedir, accent: accentProp = 'purple' }) {
+function CascadeExplorerInner({ homedir, accent: accentProp = 'blue' }) {
   const { T } = useTheme()
 
   // ── Persisted settings ────────────────────────────────────────
@@ -384,7 +384,7 @@ function CascadeExplorerInner({ homedir, accent: accentProp = 'purple' }) {
       width: '100%', height: '100%',
       fontFamily: '"Segoe UI Variable", "Segoe UI", -apple-system, BlinkMacSystemFont, system-ui, sans-serif',
       color: T.text, display: 'flex', flexDirection: 'column',
-      overflow: 'hidden', borderRadius: 10,
+      overflow: 'hidden', borderRadius: 8,
       background: T.bg,
       position: 'relative',
     }}>
