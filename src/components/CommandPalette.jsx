@@ -2,7 +2,59 @@ import React from 'react'
 import { FileTile, IconSearch, IconPlus, IconCommand, IconEye } from './icons'
 import { useTheme } from '../contexts/ThemeContext'
 
-// ── Local smart query parser (no API needed) ─────────────────────────────────
+// ── Fuzzy matching ────────────────────────────────────────────────────────────
+function levenshtein(a, b) {
+  const m = a.length, n = b.length
+  if (m === 0) return n
+  if (n === 0) return m
+  const row = Array.from({ length: n + 1 }, (_, i) => i)
+  for (let i = 1; i <= m; i++) {
+    let prev = i
+    for (let j = 1; j <= n; j++) {
+      const val = a[i - 1] === b[j - 1] ? row[j - 1] : 1 + Math.min(row[j - 1], row[j], prev)
+      row[j - 1] = prev
+      prev = val
+    }
+    row[n] = prev
+  }
+  return row[n]
+}
+
+// Returns a score 0–1 (higher = better match). 0 means no match.
+function fuzzyScore(query, filename) {
+  const q = query.toLowerCase().trim()
+  const f = filename.toLowerCase()
+  if (!q) return 0
+  if (f.includes(q)) return 1                         // exact substring — best
+  if (f.startsWith(q)) return 0.95
+
+  // Split both into tokens and match each query word fuzzily
+  const qWords = q.split(/[\s\-_.]+/).filter(w => w.length > 1)
+  const fWords = f.split(/[\s\-_.()[\]]+/).filter(Boolean)
+  if (qWords.length === 0) return 0
+
+  let matched = 0
+  for (const qw of qWords) {
+    const threshold = qw.length <= 3 ? 0 : qw.length <= 5 ? 1 : 2
+    // Check against each file token AND sliding windows inside longer tokens
+    let best = Infinity
+    for (const fw of fWords) {
+      best = Math.min(best, levenshtein(qw, fw))
+      // Also try substrings of fw the same length as qw (catches "claide" inside "cascade")
+      if (fw.length > qw.length) {
+        for (let s = 0; s <= fw.length - qw.length; s++) {
+          best = Math.min(best, levenshtein(qw, fw.slice(s, s + qw.length)))
+        }
+      }
+      if (best === 0) break
+    }
+    if (best <= threshold) matched++
+  }
+
+  if (matched === qWords.length) return 0.7           // all words matched fuzzily
+  if (matched > 0) return 0.3 * (matched / qWords.length)
+  return 0
+}
 function parseSmartQuery(q) {
   const s = q.toLowerCase().trim()
 
@@ -141,12 +193,18 @@ export default function CommandPalette({ onClose, cascade, setCascade, setShowSh
     const base = ql.length >= 2
       ? (() => {
           const seen = new Set()
-          const merged = []
-          for (const e of [...fsResults, ...cachedFiles.filter(e => e.name.toLowerCase().includes(ql))]) {
-            if (!seen.has(e.path)) { seen.add(e.path); merged.push(e) }
-            if (merged.length >= 40) break
+          const scored = []
+          // Exact filesystem search results come first with top score
+          for (const e of fsResults) {
+            if (!seen.has(e.path)) { seen.add(e.path); scored.push({ e, score: 1 }) }
           }
-          return merged
+          // Score all cached files with fuzzy matcher
+          for (const e of cachedFiles) {
+            if (seen.has(e.path)) continue
+            const score = fuzzyScore(ql, e.name)
+            if (score > 0) { seen.add(e.path); scored.push({ e, score }) }
+          }
+          return scored.sort((a, b) => b.score - a.score).slice(0, 40).map(s => s.e)
         })()
       : cachedFiles.filter(e => e.kind !== 'folder').slice(0, 40)
 
