@@ -35,9 +35,34 @@
       "out/**"
     ],
     "win": {
-      "target": "zip",
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "zip",  "arch": ["x64"] }
+      ],
       "icon": "resources/icon.png"
     },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "include": "build/installer.nsh",
+      "runAfterFinish": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "fileAssociations": [
+      {
+        "ext": ["zip", "7z"],
+        "name": "Archive",
+        "description": "Open archive in Cascade Explorer",
+        "role": "Viewer"
+      },
+      {
+        "ext": ["jpg", "jpeg", "png", "gif", "webp"],
+        "name": "Image",
+        "description": "Preview image in Cascade Explorer",
+        "role": "Viewer"
+      }
+    ],
     "mac": {
       "target": "zip",
       "category": "public.app-category.utilities",

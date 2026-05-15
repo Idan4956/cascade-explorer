@@ -136,6 +136,7 @@ function CascadeExplorerInner({ homedir, accent: accentProp = 'blue' }) {
   const [activeTagFilter, setActiveTagFilter] = React.useState(null)
   const [starredPaths, setStarredPaths] = React.useState(new Set())
   const [starFilter, setStarFilter] = React.useState(false)
+  const [recentFolders, setRecentFolders] = React.useState([])
 
   // ── Clipboard: { paths: string[], mode: 'copy'|'cut' } ───────
   const [clipboard, setClipboard] = React.useState(null)
@@ -158,7 +159,10 @@ function CascadeExplorerInner({ homedir, accent: accentProp = 'blue' }) {
     api.getAllTags().then(t => setTagMap(t || {}))
     api.getTagDefs().then(d => { if (d) setTagDefs(d) })
     api.getStarred().then(paths => { if (paths) setStarredPaths(new Set(paths)) })
-  }, [])
+    api.getRecentFolders?.().then(r => { if (r) setRecentFolders(r) })
+    const cleanup = api.onOpenPath?.(p => navigateTo([p]))
+    return cleanup
+  }, [navigateTo])
 
   const toggleStar = React.useCallback(async (filePath) => {
     const api = window.electronAPI
@@ -244,6 +248,11 @@ function CascadeExplorerInner({ homedir, accent: accentProp = 'blue' }) {
       return newCascade
     })
     setForwardHistory([])
+    const lastDir = newCascade[newCascade.length - 1]
+    if (lastDir) {
+      window.electronAPI?.addRecentFolder?.(lastDir)
+        .then(updated => { if (updated) setRecentFolders(updated) })
+    }
   }, [])
 
   const goBack = React.useCallback(() => {
@@ -423,6 +432,10 @@ function CascadeExplorerInner({ homedir, accent: accentProp = 'blue' }) {
       else if (meta && e.key === 'w') { e.preventDefault(); closeTab(activeTabId) }
       else if (e.key === 'F2') { e.preventDefault(); setShowRename(true) }
       else if (e.key === 'Backspace' && (e.metaKey || e.altKey)) { goBack() }
+      else if (meta && e.shiftKey && e.key === 'C') {
+        const item = (flatMultiRef.current[0] || lastSelItemsRef.current[0])
+        if (item) { navigator.clipboard?.writeText(item.path); addToast('Path copied') }
+      }
       else if (meta && e.key === 'c') {
         const paths = (flatMultiRef.current.length ? flatMultiRef.current : lastSelItemsRef.current).map(i => i.path)
         if (paths.length) { setClipboard({ paths, mode: 'copy' }); addToast(`${paths.length} item${paths.length > 1 ? 's' : ''} copied`) }
@@ -525,6 +538,7 @@ function CascadeExplorerInner({ homedir, accent: accentProp = 'blue' }) {
           onAddTag={addTag} onDeleteTag={deleteTag}
           starFilter={starFilter} onToggleStarFilter={() => setStarFilter(v => !v)}
           starredCount={starredPaths.size}
+          recentFolders={recentFolders}
         />
 
         <div style={{ flex: 1, display: 'flex', minWidth: 0, overflow: 'hidden' }}>
@@ -628,7 +642,7 @@ function CascadeExplorerInner({ homedir, accent: accentProp = 'blue' }) {
       )}
       {ctxMenu && (
         <ContextMenu x={ctxMenu.x} y={ctxMenu.y} accent={A} onClose={() => setCtxMenu(null)}
-          items={buildContextItems(ctxMenu, { togglePin, setShowRename, setCtxMenu, handleDelete, tagMap, toggleTag, tagDefs })}
+          items={buildContextItems(ctxMenu, { togglePin, setShowRename, setCtxMenu, handleDelete, tagMap, toggleTag, tagDefs, addToast })}
         />
       )}
       {quickLookItem && (
@@ -779,12 +793,13 @@ function StackPreviewLoader({ parentPath, selectedPath, onSelect, onEntries }) {
   return <StackPreviewPanel items={entries} selectedPath={selectedPath} onSelect={onSelect} />
 }
 
-function buildContextItems(ctxMenu, { togglePin, setShowRename, setCtxMenu, handleDelete, tagMap, toggleTag, tagDefs }) {
+function buildContextItems(ctxMenu, { togglePin, setShowRename, setCtxMenu, handleDelete, tagMap, toggleTag, tagDefs, addToast }) {
   const item = ctxMenu?.item
   const currentTags = item ? (tagMap[item.path] || []) : []
   return [
     { icon: <IconEye size={12} />, label: 'Open', kbd: '↵', onClick: () => { window.electronAPI?.openExternal(item?.path); setCtxMenu(null) } },
     { icon: <IconWindow size={12} />, label: 'Show in Finder / Explorer', onClick: () => { window.electronAPI?.showInFolder(item?.path); setCtxMenu(null) } },
+    { icon: <IconCopy size={12} />, label: 'Copy path', onClick: () => { navigator.clipboard?.writeText(item?.path || ''); addToast?.('Path copied'); setCtxMenu(null) } },
     { divider: true },
     { icon: <IconPin size={12} />, label: 'Pin column', onClick: () => { if (item) togglePin(item.path); setCtxMenu(null) } },
     { icon: <IconRename size={12} />, label: 'Rename', kbd: 'F2', onClick: () => { setCtxMenu(null); setShowRename(true) } },

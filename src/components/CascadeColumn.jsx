@@ -1,6 +1,6 @@
 import React from 'react'
 import { useDirectory } from '../hooks/useDirectory'
-import { FileTile, IconFilter, IconChevronUp, IconChevronDown, IconChevronRight, IconPin, IconTrash, IconRename, IconCopy } from './icons'
+import { FileTile, IconFilter, IconChevronUp, IconChevronDown, IconChevronRight, IconPin, IconTrash, IconRename, IconCopy, IconGrid, IconList } from './icons'
 import { useTheme } from '../contexts/ThemeContext'
 
 export default function CascadeColumn({
@@ -40,6 +40,7 @@ export default function CascadeColumn({
   const [dragOverPath, setDragOverPath] = React.useState(null)
   const [isDragOver, setIsDragOver] = React.useState(false)
   const [kbIdx, setKbIdx] = React.useState(-1)
+  const [viewMode, setViewMode] = React.useState('list') // 'list' | 'grid'
   const newInputRef = React.useRef(null)
   const renameInputRef = React.useRef(null)
 
@@ -191,6 +192,9 @@ export default function CascadeColumn({
         <HeaderBtn onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')} title={sortDir === 'asc' ? 'Ascending' : 'Descending'} T={T}>
           {sortDir === 'asc' ? <IconChevronUp size={10} /> : <IconChevronDown size={10} />}
         </HeaderBtn>
+        <HeaderBtn active={viewMode === 'grid'} onClick={() => setViewMode(m => m === 'list' ? 'grid' : 'list')} title={viewMode === 'list' ? 'Grid view' : 'List view'} T={T}>
+          {viewMode === 'list' ? <IconGrid size={10} /> : <IconList size={10} />}
+        </HeaderBtn>
         <HeaderBtn active={isPinned} onClick={onTogglePin} title={isPinned ? 'Unpin column' : 'Pin column'} T={T}>
           <IconPin size={10} />
         </HeaderBtn>
@@ -241,7 +245,53 @@ export default function CascadeColumn({
           </div>
         )}
 
-        {!error && filtered.map((item, idx) => {
+        {!error && viewMode === 'grid' && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2, padding: 4 }}>
+            {filtered.map(item => {
+              const isSel = selectedPath === item.path || multiSel.includes(item.path)
+              const isCut = cutPaths?.has(item.path)
+              const isStarred = starredPaths?.has(item.path)
+              const selBg = isSel ? accent.c : 'transparent'
+              return (
+                <button
+                  key={item.path}
+                  onClick={(e) => onSelect(item, e)}
+                  onContextMenu={(e) => onContextMenu(e, item)}
+                  title={item.name}
+                  style={{
+                    width: 72, minHeight: 74, flexShrink: 0,
+                    display: 'flex', flexDirection: 'column', alignItems: 'center',
+                    justifyContent: 'flex-start', gap: 4, padding: '8px 4px 6px',
+                    borderRadius: 6, border: 'none', cursor: 'pointer', textAlign: 'center',
+                    background: selBg, color: isSel ? '#fff' : T.text,
+                    opacity: isCut ? 0.4 : 1,
+                    transition: 'background 0.08s',
+                  }}
+                  onMouseEnter={e => { if (!isSel) e.currentTarget.style.background = T.hoverBg }}
+                  onMouseLeave={e => { e.currentTarget.style.background = selBg }}>
+                  <div style={{ position: 'relative' }}>
+                    <FileTile kind={item.kind} name={item.name} size={26} />
+                    {isStarred && (
+                      <div style={{ position: 'absolute', top: -3, right: -4, width: 8, height: 8 }}>
+                        <svg viewBox="0 0 24 24" fill="#f5a623" stroke="#f5a623" strokeWidth="1"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" /></svg>
+                      </div>
+                    )}
+                  </div>
+                  <span style={{
+                    fontSize: 10.5, lineHeight: 1.3, width: '100%',
+                    overflow: 'hidden', display: '-webkit-box',
+                    WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                    wordBreak: 'break-all',
+                  }}>
+                    {item.name}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        {!error && viewMode === 'list' && filtered.map((item, idx) => {
           const isSel = selectedPath === item.path || multiSel.includes(item.path)
           const isMulti = multiSel.includes(item.path) && multiSel.length > 1
           const itemTags = tagMap?.[item.path] || item.tags || []
@@ -253,6 +303,7 @@ export default function CascadeColumn({
           const isStarred = starredPaths?.has(item.path)
           const gitStatus = gitStatuses?.[item.path]
           const isKb = kbIdx === idx
+          const showCheck = isHovered || isMulti
 
           const rowBg = isDragTarget
             ? accent.soft
@@ -265,6 +316,27 @@ export default function CascadeColumn({
               style={{ position: 'relative', display: 'flex', alignItems: 'center', opacity: isCut ? 0.4 : 1 }}
               onMouseEnter={() => setHoveredItem(item.path)}
               onMouseLeave={() => setHoveredItem(null)}>
+
+              {/* Multi-select checkbox */}
+              {showCheck && (
+                <div
+                  onClick={(e) => { e.stopPropagation(); onSelect(item, { ctrlKey: true }) }}
+                  style={{
+                    position: 'absolute', left: 7, top: '50%', transform: 'translateY(-50%)',
+                    width: 14, height: 14, borderRadius: 3, zIndex: 5,
+                    border: isMulti ? 'none' : `1.5px solid ${T.borderMid}`,
+                    background: isMulti ? accent.c : (T.dark ? 'rgba(30,25,50,0.9)' : 'rgba(255,255,255,0.92)'),
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: 'pointer', boxShadow: '0 1px 3px rgba(0,0,0,0.15)',
+                  }}>
+                  {isMulti && (
+                    <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
+                      <path d="M1.5 4.5l2 2 4-4" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  )}
+                </div>
+              )}
+
               <button
                 onClick={(e) => !isRenaming && onSelect(item, e)}
                 onContextMenu={(e) => onContextMenu(e, item)}

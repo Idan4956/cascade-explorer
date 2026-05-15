@@ -14,6 +14,46 @@ let mainWin = null
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
 
+// ── Recent folders ────────────────────────────────────────────────────────────
+let recentFolders = []
+const recentFoldersPath = () => path.join(app.getPath('userData'), 'recent-folders.json')
+
+function loadRecentFolders() {
+  try { recentFolders = JSON.parse(fs.readFileSync(recentFoldersPath(), 'utf-8')) } catch { recentFolders = [] }
+}
+
+function addRecentFolder(folderPath) {
+  if (!folderPath || typeof folderPath !== 'string') return
+  recentFolders = [folderPath, ...recentFolders.filter(p => p !== folderPath)].slice(0, 12)
+  try { fs.writeFileSync(recentFoldersPath(), JSON.stringify(recentFolders)) } catch {}
+  updateJumpList()
+}
+
+function updateJumpList() {
+  if (process.platform !== 'win32') return
+  try {
+    app.setJumpList([
+      {
+        type: 'custom',
+        name: 'Recent Folders',
+        items: recentFolders.slice(0, 8).map(p => ({
+          type: 'task',
+          title: path.basename(p) || p,
+          description: p,
+          program: process.execPath,
+          args: `"${p}"`,
+          iconPath: process.execPath,
+          iconIndex: 0,
+        })),
+      },
+      { type: 'recent' },
+    ])
+  } catch {}
+}
+
+ipcMain.handle('recent:getFolders', () => recentFolders)
+ipcMain.handle('recent:addFolder', (_, folderPath) => { addRecentFolder(folderPath); return recentFolders })
+
 // ── AI key persistence ────────────────────────────────────────────────────────
 let aiApiKey = null
 const aiKeyPath = () => path.join(app.getPath('userData'), 'ai-key.txt')
@@ -90,7 +130,20 @@ ipcMain.handle('app:checkUpdate', () => new Promise((resolve) => {
   req.end()
 }))
 
+function getLaunchPath() {
+  const args = process.argv.slice(app.isPackaged ? 1 : 2)
+  for (const arg of args) {
+    if (arg.startsWith('-')) continue
+    try { if (fs.existsSync(arg)) return arg } catch {}
+    // AutoPlay passes %L which may be a bare drive letter like "E:\"
+    const cleaned = arg.replace(/["']/g, '')
+    try { if (cleaned && fs.existsSync(cleaned)) return cleaned } catch {}
+  }
+  return null
+}
+
 function createWindow() {
+  const launchPath = getLaunchPath()
   const win = new BrowserWindow({
     width: 1400,
     height: 860,
@@ -115,6 +168,12 @@ function createWindow() {
     win.loadFile(join(__dirname, '../renderer/index.html'))
   }
 
+  if (launchPath) {
+    win.webContents.once('did-finish-load', () => {
+      win.webContents.send('app:openPath', launchPath)
+    })
+  }
+
   // Forward window control IPC calls
   ipcMain.on('window:minimize', () => win.minimize())
   ipcMain.on('window:maximize', () => {
@@ -132,6 +191,7 @@ app.whenReady().then(() => {
   loadTags()
   loadStarred()
   loadAiKey()
+  loadRecentFolders()
   createWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

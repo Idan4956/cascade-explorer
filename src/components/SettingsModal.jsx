@@ -126,9 +126,12 @@ export default function SettingsModal({
               ['Command palette', 'Ctrl+K'],
               ['Settings',        'Ctrl+,'],
               ['Copy',            'Ctrl+C'],
+              ['Copy path',       'Ctrl+Shift+C'],
               ['Cut',             'Ctrl+X'],
               ['Paste',           'Ctrl+V'],
+              ['Quick Look',      'Space'],
               ['Rename',          'F2'],
+              ['Grid / List',     'Column header'],
               ['Go back',         'Alt+←'],
               ['Navigate items',  '↑ ↓ → ↵'],
             ].map(([action, kbd]) => (

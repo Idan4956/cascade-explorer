@@ -1,5 +1,5 @@
 import React from 'react'
-import { IconHome, IconClock, IconStar, IconCommand, FileTile } from './icons'
+import { IconHome, IconClock, IconStar, IconCommand, IconFolderOpen, FileTile } from './icons'
 import { StorageTreemap } from './features'
 import { useTheme } from '../contexts/ThemeContext'
 
@@ -17,6 +17,7 @@ export default function CascadeSidebar({
   cascade, homedir, places, drives = [], onJump, accent, setShowShortcuts, onSmartFolder,
   tagDefs = [], activeTagFilter, onTagFilter, onAddTag, onDeleteTag,
   starFilter, onToggleStarFilter, starredCount = 0,
+  recentFolders = [],
 }) {
   const { T } = useTheme()
   const activePath = cascade[cascade.length - 1]
@@ -81,6 +82,8 @@ export default function CascadeSidebar({
     boxSizing: 'border-box',
   }
 
+  const visibleRecents = recentFolders.filter(p => p !== homedir).slice(0, 8)
+
   return (
     <div style={{
       width: 188,
@@ -126,6 +129,34 @@ export default function CascadeSidebar({
           })}
         </div>
       ))}
+
+      {/* Recent folders */}
+      {visibleRecents.length > 0 && (
+        <div style={{ marginBottom: 4 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: T.textDim, letterSpacing: 0.5, padding: '8px 10px 4px', textTransform: 'uppercase' }}>
+            Recent
+          </div>
+          {visibleRecents.map(p => {
+            const name = p.split(/[\\/]/).filter(Boolean).pop() || p
+            const isActive = activePath === p || activePath?.startsWith(p + '/') || activePath?.startsWith(p + '\\')
+            return (
+              <button key={p} onClick={() => onJump([p])} title={p} style={{
+                display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 4,
+                border: 'none', background: isActive ? accent.soft : 'transparent',
+                fontSize: 12, cursor: 'pointer',
+                color: isActive ? accent.c : T.text,
+                fontWeight: isActive ? 600 : 400,
+                width: '100%', textAlign: 'left',
+              }}
+                onMouseEnter={e => !isActive && (e.currentTarget.style.background = T.hoverBg)}
+                onMouseLeave={e => !isActive && (e.currentTarget.style.background = 'transparent')}>
+                <IconClock size={13} color={isActive ? accent.c : T.textDim} />
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {/* Tags section */}
       <div style={{ marginBottom: 4 }}>

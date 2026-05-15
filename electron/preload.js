@@ -41,6 +41,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   aiQuery: (opts) => ipcRenderer.invoke('ai:query', opts),
   aiReadFileSnippet: (filePath) => ipcRenderer.invoke('ai:readFileSnippet', filePath),
 
+  // Recent folders + launch path
+  getRecentFolders: () => ipcRenderer.invoke('recent:getFolders'),
+  addRecentFolder: (folderPath) => ipcRenderer.invoke('recent:addFolder', folderPath),
+  onOpenPath: (cb) => {
+    ipcRenderer.on('app:openPath', (_, p) => cb(p))
+    return () => ipcRenderer.removeAllListeners('app:openPath')
+  },
+
   // Window controls
   minimize: () => ipcRenderer.send('window:minimize'),
   maximize: () => ipcRenderer.send('window:maximize'),
